@@ -1,0 +1,117 @@
+{% extends "partials/base.html" %}
+
+{% block title %}{{ item.name }} - AquaStore{% endblock %}
+
+{% block extra_css %}
+<style>
+.detail-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 560px) 1fr;
+    gap: 2rem;
+    margin-top: 1rem;
+}
+@media (max-width: 768px) {
+    .detail-layout { grid-template-columns: 1fr; }
+}
+.detail-image {
+    max-width: 560px;
+    aspect-ratio: 1;
+    background: #f1f5f9;
+    border-radius: 16px;
+    overflow: hidden;
+}
+.detail-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.detail-info h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--slate-900);
+    margin-bottom: 0.5rem;
+}
+.detail-meta {
+    color: var(--slate-600);
+    font-size: 0.9375rem;
+    margin-bottom: 0.5rem;
+}
+.detail-stock {
+    display: inline-block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    padding: 0.25rem 0.6rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+.detail-stock-in { background: #d1fae5; color: #065f46; }
+.detail-stock-out { background: #fee2e2; color: #b91c1c; }
+.btn-add-detail-disabled {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    background: #e2e8f0;
+    color: var(--slate-500);
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: default;
+    font-family: inherit;
+}
+.detail-price {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--aqua-600);
+    margin-bottom: 1rem;
+}
+.detail-desc {
+    color: var(--slate-600);
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+}
+.btn-add-detail {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(135deg, var(--aqua-600), var(--aqua-500));
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+}
+.btn-add-detail:hover { opacity: 0.9; }
+</style>
+{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('foods') }}" class="btn-back">← Back to Foods</a>
+
+<div class="detail-layout">
+    <div class="detail-image">
+        <img src="{{ item.image }}" alt="{{ item.name }}">
+    </div>
+    <div class="detail-info">
+        <h1>{{ item.name }}</h1>
+        <div class="detail-meta">Category: {{ item.category }}</div>
+        {% if not (item.in_stock | default(true)) %}
+        <span class="detail-stock detail-stock-out">Out of stock</span>
+        {% endif %}
+        <div class="detail-price">LKR {{ "%.2f"|format(item.price) }}</div>
+        <p class="detail-desc">{{ item.description }}</p>
+        {% if item.in_stock | default(true) %}
+        <button type="button" class="btn-add-detail" data-name="{{ item.name }}" data-price="{{ item.price }}" data-image="{{ item.image }}" data-weight="{{ item.weight or 0 }}" onclick="AquaCart.add(this.dataset.name, parseFloat(this.dataset.price), this.dataset.image || '', this.dataset.weight)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 2a1 1 0 0 0-.9.6L2.2 9.4A1 1 0 0 0 3 11h1.4l1.8 9.2a1 1 0 0 0 1 .8h9.6a1 1 0 0 0 1-.8L18.6 11H21a1 1 0 0 0 .8-1.6L18.9 2.6A1 1 0 0 0 18 2H6zm3.2 9h5.6l-1.2 6H10.4L9.2 11z"/></svg>
+            Add to cart
+        </button>
+        {% else %}
+        <span class="btn-add-detail btn-add-detail-disabled" aria-disabled="true">Out of stock</span>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

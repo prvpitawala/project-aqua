@@ -1,0 +1,18 @@
+{% extends "partials/base.html" %}
+
+{% block title %}{{ title }} - AquaStore Admin{% endblock %}
+
+{% block content %}
+<div class="page-header admin-header">
+    <div>
+        <a href="{{ back_url }}" class="back-link">← Dashboard</a>
+        <h1>{{ title }}</h1>
+        <p>Add, edit, and manage {{ section }}</p>
+    </div>
+</div>
+
+<div class="card">
+    <p style="color: var(--slate-600);">Management interface for {{ section }}. Add CRUD functionality here.</p>
+</div>
+
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "partials/base.html" %}
+
+{% block title %}Weight-based delivery prices - AquaStore Admin{% endblock %}
+
+{% block content %}
+<div class="page-header admin-header">
+    <div>
+        <a href="{{ url_for('admin_dashboard') }}" class="back-link">← Dashboard</a>
+        <h1>Weight-based delivery prices</h1>
+        <p>Set base delivery price and charge per extra kg</p>
+    </div>
+</div>
+
+{% if message %}
+<div class="alert alert-{{ message_type }}">{{ message }}</div>
+{% endif %}
+
+<div class="base-rule-card card">
+    <h2 class="form-card-title">Base + per kg rule (main delivery rule)</h2>
+    <p class="base-rule-desc">Under <strong>{{ base_rule.max_weight_kg|round(2) }} kg</strong>: <strong>LKR {{ base_rule.base_price|round(2) }}</strong>. Each extra <strong>1 kg</strong>: <strong>LKR {{ base_rule.extra_per_kg|round(2) }}</strong>.</p>
+    <form method="post" action="{{ url_for('admin_delivery_prices') }}" class="delivery-form base-rule-form">
+        <div class="form-row three-cols">
+            <div class="form-group">
+                <label for="max_weight_kg">Up to weight (kg) *</label>
+                <input type="number" id="max_weight_kg" name="max_weight_kg" step="0.01" min="0" value="{{ base_rule.max_weight_kg|round(2) }}" required placeholder="1.5">
+            </div>
+            <div class="form-group">
+                <label for="base_price">Base price (LKR) *</label>
+                <input type="number" id="base_price" name="base_price" step="0.01" min="0" value="{{ base_rule.base_price|round(2) }}" required placeholder="450">
+            </div>
+            <div class="form-group">
+                <label for="extra_per_kg">Per extra kg (LKR) *</label>
+                <input type="number" id="extra_per_kg" name="extra_per_kg" step="0.01" min="0" value="{{ base_rule.extra_per_kg|round(2) }}" required placeholder="100">
+            </div>
+        </div>
+        <button type="submit" class="btn-submit">Update base rule</button>
+    </form>
+</div>
+
+<style>
+.alert { padding: 1rem 1.25rem; border-radius: 12px; margin-bottom: 1rem; }
+.alert-success { background: #d1fae5; color: #065f46; }
+.alert-error { background: #fee2e2; color: #b91c1c; }
+.form-card-title { font-size: 1.125rem; font-weight: 700; color: var(--slate-900); margin: 0 0 1rem 0; }
+.base-rule-card { margin-bottom: 1.5rem; padding: 1.5rem; max-width: 560px; }
+.base-rule-desc { font-size: 0.9375rem; color: var(--slate-600); margin: 0 0 1rem 0; line-height: 1.5; }
+.base-rule-form .form-row.three-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+@media (max-width: 640px) { .base-rule-form .form-row.three-cols { grid-template-columns: 1fr; } }
+.delivery-form .form-group { margin-bottom: 1rem; }
+.delivery-form label { display: block; margin-bottom: 0.4rem; font-weight: 600; font-size: 0.875rem; color: var(--slate-800); }
+.delivery-form input { width: 100%; padding: 0.6rem 0.9rem; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 0.9375rem; }
+.delivery-form input:focus { outline: none; border-color: var(--aqua-500); }
+.btn-submit { padding: 0.65rem 1.25rem; background: linear-gradient(135deg, var(--aqua-600), var(--aqua-500)); color: white; border: none; border-radius: 10px; font-size: 0.9375rem; font-weight: 600; cursor: pointer; font-family: inherit; }
+.btn-submit:hover { opacity: 0.9; }
+</style>
+{% endblock %}

@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Sign In - AquaStore</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --aqua-50: #ecfeff;
+            --aqua-100: #cffafe;
+            --aqua-200: #a5f3fc;
+            --aqua-400: #22d3ee;
+            --aqua-500: #06b6d4;
+            --aqua-600: #0891b2;
+            --aqua-700: #0e7490;
+            --aqua-800: #155e75;
+            --slate-800: #1e293b;
+            --slate-600: #475569;
+        }
+        body {
+            font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #0c4a6e 0%, #06b6d4 50%, #22d3ee 100%);
+            background-attachment: fixed;
+            padding: 2rem;
+            position: relative;
+            overflow-x: hidden;
+        }
+        body::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(34, 211, 238, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(8, 145, 178, 0.2) 0%, transparent 50%);
+            pointer-events: none;
+        }
+        .signin-wrapper {
+            position: relative;
+            z-index: 1;
+        }
+        .signin-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            padding: 2.75rem;
+            border-radius: 24px;
+            box-shadow: 
+                0 25px 50px -12px rgba(0, 0, 0, 0.25),
+                0 0 0 1px rgba(255, 255, 255, 0.5);
+            width: 100%;
+            max-width: 400px;
+            animation: cardEnter 0.5s ease-out;
+        }
+        @keyframes cardEnter {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .logo {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .logo-icon {
+            width: 56px;
+            height: 56px;
+            margin: 0 auto 1rem;
+            background: linear-gradient(135deg, var(--aqua-500), var(--aqua-400));
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+        }
+        .logo h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--slate-800);
+            letter-spacing: -0.02em;
+        }
+        .logo p {
+            font-size: 0.95rem;
+            color: var(--slate-600);
+            margin-top: 0.25rem;
+            font-weight: 500;
+        }
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--slate-800);
+            font-size: 0.9rem;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-family: inherit;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-group input:hover {
+            border-color: #cbd5e1;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--aqua-500);
+            box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.15);
+        }
+        .form-group input::placeholder {
+            color: #94a3b8;
+        }
+        .form-actions {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1.75rem;
+        }
+        .form-actions button, .form-actions a {
+            flex: 1;
+            padding: 0.875rem 1.25rem;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            text-align: center;
+            text-decoration: none;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        .btn-signin {
+            background: linear-gradient(135deg, var(--aqua-600), var(--aqua-500));
+            color: white;
+            box-shadow: 0 4px 14px rgba(6, 182, 212, 0.4);
+        }
+        .btn-signin:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(6, 182, 212, 0.5);
+        }
+        .btn-signin:active {
+            transform: translateY(0);
+        }
+        .btn-cancel {
+            background: #f1f5f9;
+            color: var(--slate-600);
+        }
+        .btn-cancel:hover {
+            background: #e2e8f0;
+            color: var(--slate-800);
+        }
+        .error-msg {
+            color: #991b1b;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            background: #fef2f2;
+            border-radius: 8px;
+            display: none;
+        }
+        .back-link {
+            margin-top: 1.5rem;
+            text-align: center;
+        }
+        .back-link a {
+            color: var(--slate-600);
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            transition: color 0.2s;
+        }
+        .back-link a:hover {
+            color: var(--aqua-600);
+        }
+    </style>
+</head>
+<body>
+    <div class="signin-wrapper">
+        <div class="signin-card">
+            <div class="logo">
+                <div class="logo-icon">◈</div>
+                <h1>AquaStore</h1>
+                <p>Admin Sign In</p>
+            </div>
+            <form id="adminLoginForm" onsubmit="submitAdminLogin(event)">
+                <div class="form-group">
+                    <label for="adminUser">Username</label>
+                    <input type="text" id="adminUser" name="username" placeholder="Enter your username" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="adminPass">Password</label>
+                    <input type="password" id="adminPass" name="password" placeholder="Enter your password" required autocomplete="current-password">
+                </div>
+                <div id="loginError" class="error-msg"></div>
+                <div class="form-actions">
+                    <a href="/" class="btn-cancel">Cancel</a>
+                    <button type="submit" class="btn-signin">Sign In</button>
+                </div>
+            </form>
+            <div class="back-link">
+                <a href="/">← Back to Home</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function submitAdminLogin(e) {
+            e.preventDefault();
+            const form = e.target;
+            const data = new FormData(form);
+            fetch('/admin/login', {
+                method: 'POST',
+                body: data,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    globalThis.location.href = data.redirect || '/admin';
+                } else {
+                    const err = document.getElementById('loginError');
+                    err.textContent = data.error || 'Invalid credentials';
+                    err.style.display = 'block';
+                }
+            })
+            .catch(() => {
+                document.getElementById('loginError').textContent = 'An error occurred';
+                document.getElementById('loginError').style.display = 'block';
+            });
+        }
+    </script>
+</body>
+</html>

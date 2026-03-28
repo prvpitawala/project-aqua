@@ -1,0 +1,226 @@
+{% extends "partials/base.html" %}
+
+{% block title %}Edit Plant - AquaStore Admin{% endblock %}
+
+{% block content %}
+<div class="page-header admin-header">
+    <div>
+        <a href="{{ url_for('admin_plants') }}" class="back-link">← Manage Plants</a>
+        <h1>Edit Plant</h1>
+        <p>Update {{ item.name }}</p>
+    </div>
+</div>
+
+{% if message %}
+<div class="alert alert-{{ message_type }}">{{ message }}</div>
+{% endif %}
+
+<form method="post" action="{{ url_for('admin_plants_edit', id=item.id) }}" enctype="multipart/form-data" class="edit-form">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="name">Name *</label>
+                <input type="text" id="name" name="name" value="{{ item.name|e }}" required placeholder="e.g. Java Fern">
+            </div>
+            <div class="form-group">
+                <label for="price">Price (LKR) *</label>
+                <input type="number" id="price" name="price" step="0.01" min="0" value="{{ item.price }}" required placeholder="500">
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="category">Category *</label>
+            <select id="category" name="category" required>
+                <option value="">Select category</option>
+                <option value="Anubias & Fern" {{ 'selected' if item.category == 'Anubias & Fern' else '' }}>Anubias & Fern</option>
+                <option value="Background Plant" {{ 'selected' if item.category == 'Background Plant' else '' }}>Background Plant</option>
+                <option value="Bucephalandra" {{ 'selected' if item.category == 'Bucephalandra' else '' }}>Bucephalandra</option>
+                <option value="Carpeting plant" {{ 'selected' if item.category == 'Carpeting plant' else '' }}>Carpeting plant</option>
+                <option value="Cryptocoryne" {{ 'selected' if item.category == 'Cryptocoryne' else '' }}>Cryptocoryne</option>
+                <option value="Epiphyte plants" {{ 'selected' if item.category == 'Epiphyte plants' else '' }}>Epiphyte plants</option>
+                <option value="Floating plants" {{ 'selected' if item.category == 'Floating plants' else '' }}>Floating plants</option>
+                <option value="Ludwigia Varieties" {{ 'selected' if item.category == 'Ludwigia Varieties' else '' }}>Ludwigia Varieties</option>
+                <option value="Midground Plant" {{ 'selected' if item.category == 'Midground Plant' else '' }}>Midground Plant</option>
+                <option value="Moss" {{ 'selected' if item.category == 'Moss' else '' }}>Moss</option>
+                <option value="Rare plants" {{ 'selected' if item.category == 'Rare plants' else '' }}>Rare plants</option>
+                <option value="Rotala Varieties" {{ 'selected' if item.category == 'Rotala Varieties' else '' }}>Rotala Varieties</option>
+                <option value="Other" {{ 'selected' if item.category == 'Other' else '' }}>Other</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="care_level">Care level</label>
+            <select id="care_level" name="care_level">
+                <option value="">Select care level</option>
+                <option value="Easy care" {{ 'selected' if (item.get('care_level') or '') == 'Easy care' else '' }}>Easy care</option>
+                <option value="Medium care" {{ 'selected' if (item.get('care_level') or '') == 'Medium care' else '' }}>Medium care</option>
+                <option value="High tech" {{ 'selected' if (item.get('care_level') or '') == 'High tech' else '' }}>High tech</option>
+            </select>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="co2_condition">CO₂ condition</label>
+                <select id="co2_condition" name="co2_condition">
+                    <option value="">Select CO₂</option>
+                    <option value="High CO2" {{ 'selected' if (item.get('co2_condition') or '') == 'High CO2' else '' }}>High CO2</option>
+                    <option value="Medium CO2" {{ 'selected' if (item.get('co2_condition') or '') == 'Medium CO2' else '' }}>Medium CO2</option>
+                    <option value="Low CO2" {{ 'selected' if (item.get('co2_condition') or '') == 'Low CO2' else '' }}>Low CO2</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="light_condition">Light condition</label>
+                <select id="light_condition" name="light_condition">
+                    <option value="">Select Light</option>
+                    <option value="High Light" {{ 'selected' if (item.get('light_condition') or '') == 'High Light' else '' }}>High Light</option>
+                    <option value="Medium Light" {{ 'selected' if (item.get('light_condition') or '') == 'Medium Light' else '' }}>Medium Light</option>
+                    <option value="Low Light" {{ 'selected' if (item.get('light_condition') or '') == 'Low Light' else '' }}>Low Light</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="weight">Weight</label>
+            <input type="text" id="weight" name="weight" value="{{ (item.weight or '')|e }}" placeholder="e.g. 0.5 kg, 500 g">
+        </div>
+        <div class="form-group">
+            <label for="in_stock">Stock status</label>
+            <select id="in_stock" name="in_stock">
+                <option value="1" {{ 'selected' if item.in_stock else '' }}>In stock</option>
+                <option value="0" {{ 'selected' if not item.in_stock else '' }}>Out of stock</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" rows="4" placeholder="Plant description...">{{ item.description or '' }}</textarea>
+        </div>
+        <div class="form-group image-upload-section">
+            <fieldset class="image-fieldset">
+                <legend>Product images (up to 3)</legend>
+                <p class="image-upload-hint">Click or drag to upload. Leave empty to keep current images.</p>
+            <div class="image-upload-grid">
+                <div class="image-upload-slot" data-slot="1">
+                    <input type="file" name="image1" accept="image/*" id="img1" class="image-file-input">
+                    <button type="button" class="image-upload-drop" onclick="document.getElementById('img1').click()" ondrop="handleDrop(event, 1)" ondragover="event.preventDefault()">
+                        <span class="image-preview" id="preview1">
+                            {% if item.get('has_image1') and item.id %}
+                            <img src="{{ url_for('serve_plant_image', id=item.id, slot=1) }}" alt="Current 1">
+                            <span class="image-preview-label">Current</span>
+                            {% else %}
+                            <span class="image-placeholder">
+                                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                                <span>Image 1</span>
+                            </span>
+                            {% endif %}
+                        </span>
+                    </button>
+                    <span class="image-slot-label">Primary</span>
+                </div>
+                <div class="image-upload-slot" data-slot="2">
+                    <input type="file" name="image2" accept="image/*" id="img2" class="image-file-input">
+                    <button type="button" class="image-upload-drop" onclick="document.getElementById('img2').click()" ondrop="handleDrop(event, 2)" ondragover="event.preventDefault()">
+                        <span class="image-preview" id="preview2">
+                            {% if item.get('has_image2') and item.id %}
+                            <img src="{{ url_for('serve_plant_image', id=item.id, slot=2) }}" alt="Current 2">
+                            <span class="image-preview-label">Current</span>
+                            {% else %}
+                            <span class="image-placeholder">
+                                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                                <span>Image 2</span>
+                            </span>
+                            {% endif %}
+                        </span>
+                    </button>
+                    <span class="image-slot-label">Gallery</span>
+                </div>
+                <div class="image-upload-slot" data-slot="3">
+                    <input type="file" name="image3" accept="image/*" id="img3" class="image-file-input">
+                    <button type="button" class="image-upload-drop" onclick="document.getElementById('img3').click()" ondrop="handleDrop(event, 3)" ondragover="event.preventDefault()">
+                        <span class="image-preview" id="preview3">
+                            {% if item.get('has_image3') and item.id %}
+                            <img src="{{ url_for('serve_plant_image', id=item.id, slot=3) }}" alt="Current 3">
+                            <span class="image-preview-label">Current</span>
+                            {% else %}
+                            <span class="image-placeholder">
+                                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                                <span>Image 3</span>
+                            </span>
+                            {% endif %}
+                        </span>
+                    </button>
+                    <span class="image-slot-label">Gallery</span>
+                </div>
+            </div>
+            </fieldset>
+        </div>
+        <div class="form-actions">
+            <a href="{{ url_for('admin_plants') }}" class="btn-cancel">Cancel</a>
+            <button type="submit" class="btn-submit">Save Changes</button>
+        </div>
+</form>
+
+<style>
+.alert { padding: 1rem 1.25rem; border-radius: 12px; margin-bottom: 1rem; }
+.alert-success { background: #d1fae5; color: #065f46; }
+.alert-error { background: #fee2e2; color: #b91c1c; }
+.edit-form { max-width: 640px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.form-group { margin-bottom: 1.25rem; }
+.form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 0.875rem; color: var(--slate-800); }
+.form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.75rem 1rem; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 1rem; font-family: inherit; }
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--aqua-500); }
+.form-actions { display: flex; gap: 1rem; margin-top: 1.5rem; }
+.btn-submit { padding: 0.75rem 1.5rem; background: linear-gradient(135deg, var(--aqua-600), var(--aqua-500)); color: white; border: none; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; font-family: inherit; }
+.btn-submit:hover { opacity: 0.9; }
+.btn-cancel { padding: 0.75rem 1.5rem; background: #f1f5f9; color: var(--slate-600); border-radius: 12px; font-size: 1rem; font-weight: 600; text-decoration: none; font-family: inherit; }
+.btn-cancel:hover { background: #e2e8f0; }
+.image-fieldset { border: none; padding: 0; margin: 0; }
+.image-fieldset legend { display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 0.875rem; color: var(--slate-800); }
+.image-upload-section label { margin-bottom: 0.25rem; }
+.image-upload-hint { font-size: 0.8125rem; color: var(--slate-500); margin-bottom: 1rem; }
+.image-upload-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.image-upload-slot { position: relative; }
+.image-file-input { display: none; }
+.image-upload-drop {
+    aspect-ratio: 1; border: 2px dashed #cbd5e1; border-radius: 14px; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: linear-gradient(145deg, #f8fafc 0%, #f1f5f9 100%); transition: all 0.25s ease;
+    overflow: hidden; position: relative; min-height: 120px;
+    padding: 0; font: inherit; width: 100%;
+}
+.image-upload-drop:hover { border-color: var(--aqua-400); background: linear-gradient(145deg, rgba(6, 182, 212, 0.06) 0%, rgba(6, 182, 212, 0.12) 100%); }
+.image-upload-drop:focus-within { border-color: var(--aqua-500); box-shadow: 0 0 0 3px var(--aqua-600-15); }
+.image-preview { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: absolute; inset: 0; }
+.image-preview img { width: 100%; height: 100%; object-fit: cover; }
+.image-placeholder { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; color: var(--slate-500); font-size: 0.8125rem; font-weight: 500; }
+.image-placeholder svg { opacity: 0.6; }
+.image-preview-label { position: absolute; bottom: 6px; right: 6px; background: rgba(0,0,0,0.6); color: #fff; font-size: 0.625rem; padding: 0.2rem 0.4rem; border-radius: 6px; }
+.image-slot-label { display: block; margin-top: 0.5rem; font-size: 0.7rem; font-weight: 600; color: var(--aqua-600); text-transform: uppercase; letter-spacing: 0.05em; text-align: center; }
+.image-upload-slot:first-child .image-upload-drop { border-color: var(--aqua-400); background: linear-gradient(145deg, rgba(6, 182, 212, 0.04) 0%, rgba(6, 182, 212, 0.08) 100%); }
+.image-upload-slot:first-child .image-slot-label { color: var(--aqua-600); }
+@media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } .image-upload-grid { grid-template-columns: 1fr; } }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    [1,2,3].forEach(function(slot) {
+        var inp = document.getElementById('img' + slot);
+        var prev = document.getElementById('preview' + slot);
+        if (!inp || !prev) return;
+        inp.addEventListener('change', function() {
+            var f = this.files[0];
+            if (!f || !f.type.startsWith('image/')) return;
+            var u = URL.createObjectURL(f);
+            prev.innerHTML = '<img src="' + u + '" alt="Preview"><span class="image-preview-label">New</span>';
+        });
+    });
+});
+function handleDrop(e, slot) {
+    e.preventDefault();
+    var f = e.dataTransfer && e.dataTransfer.files[0];
+    if (!f || !f.type.startsWith('image/')) return;
+    var inp = document.getElementById('img' + slot);
+    var prev = document.getElementById('preview' + slot);
+    if (inp && prev) {
+        var dt = new DataTransfer();
+        dt.items.add(f);
+        inp.files = dt.files;
+        prev.innerHTML = '<img src="' + URL.createObjectURL(f) + '" alt="Preview"><span class="image-preview-label">New</span>';
+    }
+}
+</script>
+{% endblock %}

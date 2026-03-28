@@ -1,0 +1,57 @@
+{% extends "partials/base.html" %}
+
+{% block title %}{{ plant.name }} - AquaStore Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+.detail-layout { display: grid; grid-template-columns: minmax(0, 560px) 1fr; gap: 2rem; margin-top: 1rem; }
+@media (max-width: 768px) { .detail-layout { grid-template-columns: 1fr; } }
+.detail-image { max-width: 560px; aspect-ratio: 1; background: #f1f5f9; border-radius: 16px; overflow: hidden; }
+.detail-image img { width: 100%; height: 100%; object-fit: cover; }
+.detail-info h1 { font-size: 1.75rem; font-weight: 700; color: var(--slate-900); margin-bottom: 0.5rem; }
+.detail-meta { color: var(--slate-600); font-size: 0.9375rem; margin-bottom: 0.35rem; }
+.detail-stock { display: inline-block; font-size: 0.8125rem; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 8px; margin-bottom: 1rem; }
+.detail-stock-in { background: #d1fae5; color: #065f46; }
+.detail-stock-out { background: #fee2e2; color: #b91c1c; }
+.detail-price { font-size: 1.5rem; font-weight: 700; color: var(--aqua-600); margin-bottom: 1rem; }
+.detail-desc { color: var(--slate-600); line-height: 1.6; margin-bottom: 1.5rem; }
+.btn-edit-detail { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; background: linear-gradient(135deg, var(--aqua-600), var(--aqua-500)); color: white; border: none; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; font-family: inherit; text-decoration: none; }
+.btn-edit-detail:hover { opacity: 0.9; }
+.detail-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+.detail-badge { font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 8px; background: rgba(6, 182, 212, 0.12); color: var(--aqua-700); }
+</style>
+{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('admin_plants') }}" class="btn-back">← Back to Manage Plants</a>
+
+<div class="detail-layout">
+    <div class="detail-image">
+        {% if plant.image %}
+        <img src="{{ plant.image }}" alt="{{ plant.name }}">
+        {% elif plant.get('has_image1') %}
+        <img src="{{ url_for('serve_plant_image', id=plant.id, slot=1) }}" alt="{{ plant.name }}">
+        {% else %}
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--slate-500);">No image</div>
+        {% endif %}
+    </div>
+    <div class="detail-info">
+        <h1>{{ plant.name }}</h1>
+        <div class="detail-meta">Category: {{ plant.category }}</div>
+        {% if plant.weight %}<div class="detail-meta">Weight: {{ plant.weight }}</div>{% endif %}
+        <div class="detail-badges">
+            {% if plant.get('care_level') %}<span class="detail-badge">Care: {{ plant.care_level }}</span>{% endif %}
+            {% if plant.get('co2_condition') %}<span class="detail-badge">CO₂: {{ plant.co2_condition }}</span>{% endif %}
+            {% if plant.get('light_condition') %}<span class="detail-badge">Light: {{ plant.light_condition }}</span>{% endif %}
+        </div>
+        {% if plant.in_stock %}
+        <span class="detail-stock detail-stock-in">In stock</span>
+        {% else %}
+        <span class="detail-stock detail-stock-out">Out of stock</span>
+        {% endif %}
+        <div class="detail-price">LKR {{ "%.2f"|format(plant.price) }}</div>
+        <p class="detail-desc">{{ plant.description or 'No description.' }}</p>
+        <a href="{{ url_for('admin_plants_edit', id=plant.id) }}" class="btn-edit-detail">Edit plant</a>
+    </div>
+</div>
+{% endblock %}

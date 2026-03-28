@@ -1,0 +1,162 @@
+{% extends "partials/base.html" %}
+
+{% block title %}Admin Dashboard - AquaStore{% endblock %}
+
+{% block content %}
+<div class="page-header admin-header">
+    <div>
+        <h1>Admin Dashboard</h1>
+        <p>Manage your store</p>
+    </div>
+    <div class="admin-actions">
+        <a href="{{ url_for('index') }}" class="btn-admin-link">View public site</a>
+        <a href="{{ url_for('admin_logout') }}" class="btn-logout">Logout</a>
+    </div>
+</div>
+
+<div class="explore-cards">
+    <a href="{{ url_for('admin_plants') }}" class="explore-card" style="text-decoration: none; color: inherit;">
+        <div class="explore-card-icon">🌿</div>
+        <h2 class="explore-card-title">Manage Plants</h2>
+        <p class="explore-card-desc">Add, edit, and manage aquatic plants</p>
+        <span class="explore-card-btn">Manage</span>
+    </a>
+    <a href="{{ url_for('admin_tools') }}" class="explore-card" style="text-decoration: none; color: inherit;">
+        <div class="explore-card-icon">🔧</div>
+        <h2 class="explore-card-title">Manage Tools</h2>
+        <p class="explore-card-desc">Add, edit, and manage aquarium tools</p>
+        <span class="explore-card-btn">Manage</span>
+    </a>
+    <a href="{{ url_for('admin_foods') }}" class="explore-card" style="text-decoration: none; color: inherit;">
+        <div class="explore-card-icon">🍽️</div>
+        <h2 class="explore-card-title">Manage Foods</h2>
+        <p class="explore-card-desc">Add, edit, and manage fish food products</p>
+        <span class="explore-card-btn">Manage</span>
+    </a>
+    <a href="{{ url_for('admin_messages') }}" class="explore-card" style="text-decoration: none; color: inherit;">
+        <div class="explore-card-icon">✉️</div>
+        <h2 class="explore-card-title">Contact Messages</h2>
+        <p class="explore-card-desc">Read messages sent from the contact form</p>
+        <span class="explore-card-btn">View</span>
+    </a>
+    <a href="{{ url_for('admin_delivery_prices') }}" class="explore-card explore-card-small" style="text-decoration: none; color: inherit;">
+        <div class="explore-card-icon explore-card-icon-small">📦</div>
+        <h2 class="explore-card-title explore-card-title-small">Delivery prices</h2>
+        <p class="explore-card-desc explore-card-desc-small">Weight-based delivery pricing</p>
+        <span class="explore-card-btn">Manage</span>
+    </a>
+</div>
+
+<style>
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+.admin-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+.btn-admin-link {
+    padding: 0.5rem 1rem;
+    color: var(--aqua-600);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    text-decoration: none;
+    border-radius: 10px;
+    border: 1px solid var(--aqua-500);
+    transition: all 0.2s;
+}
+.btn-admin-link:hover {
+    background: rgba(6, 182, 212, 0.1);
+}
+.btn-logout {
+    padding: 0.5rem 1rem;
+    color: var(--slate-600);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    text-decoration: none;
+    border-radius: 10px;
+    background: #f1f5f9;
+    transition: all 0.2s;
+}
+.btn-logout:hover {
+    background: #e2e8f0;
+    color: var(--slate-800);
+}
+.explore-cards {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 2rem;
+    min-height: 50vh;
+    flex-wrap: wrap;
+}
+.explore-card {
+    display: block;
+    cursor: pointer;
+    background: #fff;
+    border-radius: 24px;
+    padding: 4rem 3.5rem;
+    min-width: 360px;
+    max-width: 420px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    text-decoration: none;
+    transition: all 0.2s ease;
+    color: inherit;
+}
+.explore-card:hover {
+    border-color: var(--aqua-500);
+    box-shadow: 0 12px 32px rgba(6, 182, 212, 0.2);
+}
+.explore-card-icon {
+    font-size: 5.5rem;
+    margin-bottom: 2rem;
+}
+.explore-card-title {
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: var(--slate-900);
+    margin-bottom: 0.75rem;
+}
+.explore-card-desc {
+    font-size: 1.125rem;
+    color: var(--slate-600);
+    line-height: 1.5;
+}
+.explore-card-btn {
+    display: inline-block;
+    margin-top: 1.25rem;
+    padding: 0.6rem 1.5rem;
+    background: linear-gradient(135deg, var(--aqua-600), var(--aqua-500));
+    color: white !important;
+    font-weight: 600;
+    font-size: 1rem;
+    border-radius: 10px;
+    transition: all 0.2s ease;
+}
+.explore-card:hover .explore-card-btn {
+    box-shadow: 0 4px 14px rgba(6, 182, 212, 0.4);
+}
+.explore-card-small {
+    min-width: 220px;
+    max-width: 280px;
+    padding: 2rem 1.75rem;
+}
+.explore-card-icon-small {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+.explore-card-title-small {
+    font-size: 1.35rem;
+    margin-bottom: 0.5rem;
+}
+.explore-card-desc-small {
+    font-size: 0.9375rem;
+}
+</style>
+{% endblock %}

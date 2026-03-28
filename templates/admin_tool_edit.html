@@ -1,0 +1,95 @@
+{% extends "partials/base.html" %}
+
+{% block title %}Edit Tool - AquaStore Admin{% endblock %}
+
+{% block content %}
+<div class="page-header admin-header">
+    <div>
+        <a href="{{ url_for('admin_tools') }}" class="back-link">← Manage Tools</a>
+        <h1>Edit Tool</h1>
+        <p>Update {{ item.name }}</p>
+    </div>
+</div>
+
+{% if message %}
+<div class="alert alert-{{ message_type }}">{{ message }}</div>
+{% endif %}
+
+<form method="post" action="{{ url_for('admin_tools_edit', id=item.id) }}" enctype="multipart/form-data" class="edit-form">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="name">Name *</label>
+                <input type="text" id="name" name="name" value="{{ item.name|e }}" required placeholder="e.g. Aquarium Net">
+            </div>
+            <div class="form-group">
+                <label for="price">Price (LKR) *</label>
+                <input type="number" id="price" name="price" step="0.01" min="0" value="{{ item.price }}" required placeholder="600">
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="category">Category *</label>
+            <select id="category" name="category" required>
+                <option value="">Select category</option>
+                <option value="Aquarium Soil" {{ 'selected' if item.category == 'Aquarium Soil' else '' }}>Aquarium Soil</option>
+                <option value="water Pump" {{ 'selected' if item.category == 'water Pump' else '' }}>water Pump</option>
+                <option value="Filter Media" {{ 'selected' if item.category == 'Filter Media' else '' }}>Filter Media</option>
+                <option value="CO2 accessaries" {{ 'selected' if item.category == 'CO2 accessaries' else '' }}>CO2 accessaries</option>
+                <option value="Fertilizers & Treatment" {{ 'selected' if item.category == 'Fertilizers & Treatment' else '' }}>Fertilizers & Treatment</option>
+                <option value="Temperature accessories" {{ 'selected' if item.category == 'Temperature accessories' else '' }}>Temperature accessories</option>
+                <option value="Air pumps" {{ 'selected' if item.category == 'Air pumps' else '' }}>Air pumps</option>
+                <option value="Other product" {{ 'selected' if item.category == 'Other product' else '' }}>Other product</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="weight">Weight</label>
+            <input type="text" id="weight" name="weight" value="{{ (item.weight or '')|e }}" placeholder="e.g. 0.5 kg, 500 g">
+        </div>
+        <div class="form-group">
+            <label for="in_stock">Stock status</label>
+            <select id="in_stock" name="in_stock">
+                <option value="1" {{ 'selected' if item.in_stock else '' }}>In stock</option>
+                <option value="0" {{ 'selected' if not item.in_stock else '' }}>Out of stock</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" rows="4" placeholder="Tool description...">{{ item.description or '' }}</textarea>
+        </div>
+        <div class="form-group">
+            <fieldset class="image-fieldset">
+                <legend>Images (optional - leave empty to keep current)</legend>
+                <div class="image-inputs">
+                    <div class="image-input"><label for="edit_tool_image1">Image 1</label><input type="file" id="edit_tool_image1" name="image1" accept="image/*"></div>
+                    <div class="image-input"><label for="edit_tool_image2">Image 2</label><input type="file" id="edit_tool_image2" name="image2" accept="image/*"></div>
+                    <div class="image-input"><label for="edit_tool_image3">Image 3</label><input type="file" id="edit_tool_image3" name="image3" accept="image/*"></div>
+                </div>
+            </fieldset>
+        </div>
+        <div class="form-actions">
+            <a href="{{ url_for('admin_tools') }}" class="btn-cancel">Cancel</a>
+            <button type="submit" class="btn-submit">Save Changes</button>
+        </div>
+</form>
+
+<style>
+.alert { padding: 1rem 1.25rem; border-radius: 12px; margin-bottom: 1rem; }
+.alert-success { background: #d1fae5; color: #065f46; }
+.alert-error { background: #fee2e2; color: #b91c1c; }
+.edit-form { max-width: 600px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.form-group { margin-bottom: 1.25rem; }
+.form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 0.875rem; color: var(--slate-800); }
+.form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.75rem 1rem; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 1rem; font-family: inherit; }
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--aqua-500); }
+.image-fieldset { border: none; padding: 0; margin: 0; }
+.image-fieldset legend { display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 0.875rem; color: var(--slate-800); }
+.image-inputs { display: flex; gap: 1rem; flex-wrap: wrap; }
+.image-input { flex: 1; min-width: 120px; }
+.form-actions { display: flex; gap: 1rem; margin-top: 1.5rem; }
+.btn-submit { padding: 0.75rem 1.5rem; background: linear-gradient(135deg, var(--aqua-600), var(--aqua-500)); color: white; border: none; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; font-family: inherit; }
+.btn-submit:hover { opacity: 0.9; }
+.btn-cancel { padding: 0.75rem 1.5rem; background: #f1f5f9; color: var(--slate-600); border-radius: 12px; font-size: 1rem; font-weight: 600; text-decoration: none; font-family: inherit; }
+.btn-cancel:hover { background: #e2e8f0; }
+@media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AquaStore</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        :root {
+            --aqua-400: #22d3ee;
+            --aqua-500: #06b6d4;
+            --aqua-600: #0891b2;
+            --aqua-600-15: rgba(6, 182, 212, 0.15);
+            --slate-500: #64748b;
+            --slate-600: #475569;
+            --slate-800: #1e293b;
+            --slate-900: #0f172a;
+        }
+        body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; padding: 2rem; }
+        .btn-admin {
+            background: linear-gradient(135deg, var(--aqua-600), var(--aqua-500));
+            color: white;
+            border: none;
+            padding: 0.625rem 1.25rem;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-block;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn-admin:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(6, 182, 212, 0.35);
+        }
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(8, 145, 178, 0.7), rgba(6, 182, 212, 0.6));
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1.5rem;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+        .modal-overlay.show {
+            display: flex;
+            opacity: 1;
+        }
+        .modal-overlay.show .modal {
+            animation: modalIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        @keyframes modalIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+        .modal {
+            position: relative;
+            background: #ffffff;
+            padding: 2.5rem;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 420px;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            box-shadow:
+                0 0 0 1px rgba(0, 0, 0, 0.03),
+                0 2px 4px rgba(0, 0, 0, 0.05),
+                0 12px 24px rgba(0, 0, 0, 0.1);
+        }
+        .modal-logo {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .modal-logo .icon {
+            width: 56px;
+            height: 56px;
+            margin: 0 auto 1rem;
+            background: linear-gradient(135deg, var(--aqua-500) 0%, var(--aqua-400) 100%);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: 0 8px 24px rgba(6, 182, 212, 0.3);
+        }
+        .modal h2 {
+            margin: 0;
+            color: var(--slate-900);
+            font-size: 1.375rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--slate-800);
+            font-size: 0.875rem;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-family: inherit;
+            background: #f8fafc;
+            transition: all 0.2s ease;
+        }
+        .form-group input:hover {
+            background: #f1f5f9;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--aqua-500);
+            background: #fff;
+            box-shadow: 0 0 0 3px var(--aqua-600-15);
+        }
+        .form-group input::placeholder {
+            color: var(--slate-500);
+        }
+        .modal-actions {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1.75rem;
+        }
+        .modal-actions button {
+            flex: 1;
+            padding: 0.875rem 1.25rem;
+            border-radius: 12px;
+            font-size: 0.9375rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            font-family: inherit;
+            transition: all 0.2s ease;
+        }
+        .btn-signin {
+            background: linear-gradient(135deg, var(--aqua-600), var(--aqua-500));
+            color: white;
+            box-shadow: 0 4px 14px rgba(6, 182, 212, 0.35);
+        }
+        .btn-signin:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(6, 182, 212, 0.45);
+        }
+        .btn-signin:active {
+            transform: translateY(0);
+        }
+        .btn-cancel {
+            background: #f1f5f9;
+            color: var(--slate-600);
+        }
+        .btn-cancel:hover {
+            background: #e2e8f0;
+            color: var(--slate-800);
+        }
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 36px;
+            height: 36px;
+            background: #f1f5f9;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.25rem;
+            cursor: pointer;
+            color: var(--slate-500);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            transition: all 0.2s ease;
+        }
+        .modal-close:hover {
+            background: #e2e8f0;
+            color: var(--slate-800);
+        }
+        .error-msg {
+            color: #b91c1c;
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+            padding: 0.625rem 0.875rem;
+            background: #fef2f2;
+            border-radius: 10px;
+            display: none;
+            border: 1px solid #fecaca;
+        }
+    </style>
+</head>
+<body>
+    <h1>Welcome to AquaStore</h1>
+    <p>Your Flask app is running!</p>
+    <p style="margin-top: 0.5rem;"><a href="/public" style="color: var(--aqua-600); font-weight: 500;">Explore</a></p>
+
+    <div id="adminModal" class="modal-overlay">
+        <div class="modal" style="position:relative">
+            <button class="modal-close" onclick="closeAdminPopup()" aria-label="Close">×</button>
+            <div class="modal-logo">
+                <div class="icon">◈</div>
+                <h2>Admin Sign In</h2>
+            </div>
+            <form id="adminLoginForm" onsubmit="submitAdminLogin(event)">
+                <div class="form-group">
+                    <label for="adminUser">Username</label>
+                    <input type="text" id="adminUser" name="username" placeholder="Enter username" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="adminPass">Password</label>
+                    <input type="password" id="adminPass" name="password" placeholder="Enter password" required autocomplete="current-password">
+                </div>
+                <div id="loginError" class="error-msg"></div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" onclick="closeAdminPopup()">Cancel</button>
+                    <button type="submit" class="btn-signin">Sign In</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openAdminPopup() {
+            document.getElementById('adminModal').classList.add('show');
+            document.getElementById('loginError').style.display = 'none';
+            document.getElementById('adminUser').value = '';
+            document.getElementById('adminPass').value = '';
+        }
+        function closeAdminPopup() {
+            document.getElementById('adminModal').classList.remove('show');
+        }
+        document.getElementById('adminModal').addEventListener('click', function(e) {
+            if (e.target === this) closeAdminPopup();
+        });
+        if (globalThis.location.search.includes('open=signin')) {
+            openAdminPopup();
+            history.replaceState({}, '', globalThis.location.pathname);
+        }
+        function submitAdminLogin(e) {
+            e.preventDefault();
+            const form = e.target;
+            const data = new FormData(form);
+            fetch('/admin/login', {
+                method: 'POST',
+                body: data,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    globalThis.location.href = data.redirect || '/admin';
+                } else {
+                    const err = document.getElementById('loginError');
+                    err.textContent = data.error || 'Invalid credentials';
+                    err.style.display = 'block';
+                }
+            })
+            .catch(() => {
+                document.getElementById('loginError').textContent = 'An error occurred';
+                document.getElementById('loginError').style.display = 'block';
+            });
+        }
+    </script>
+</body>
+</html>

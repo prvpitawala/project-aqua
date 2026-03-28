@@ -1,0 +1,197 @@
+{% extends "partials/base.html" %}
+
+{% block title %}AquaStore{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Welcome to AquaStore</h1>
+    <p>Discover what's available</p>
+</div>
+
+<div class="explore-cards">
+    <a href="{{ url_for('aqua_plants') }}" class="explore-card" style="text-decoration: none; color: inherit;">
+        <div class="explore-card-icon">🌿</div>
+        <h2 class="explore-card-title">Plants</h2>
+        <p class="explore-card-desc">Browse our collection of aquatic plants</p>
+        <span class="explore-card-btn">Click here</span>
+    </a>
+    <a href="{{ url_for('accessories') }}" class="explore-card" style="text-decoration: none; color: inherit;">
+        <div class="explore-card-icon">🔧</div>
+        <h2 class="explore-card-title">Tools</h2>
+        <p class="explore-card-desc">Find accessories and tools for your aquarium</p>
+        <span class="explore-card-btn">Click here</span>
+    </a>
+    <a href="{{ url_for('foods') }}" class="explore-card" style="text-decoration: none; color: inherit;">
+        <div class="explore-card-icon">🍽️</div>
+        <h2 class="explore-card-title">Foods</h2>
+        <p class="explore-card-desc">Fish food and feeding supplies</p>
+        <span class="explore-card-btn">Click here</span>
+    </a>
+</div>
+
+<section class="top-selling-section">
+    <h2 class="section-title">Top Selling Products</h2>
+    <p class="section-subtitle">Popular picks from our customers</p>
+    <div class="top-products-grid">
+        {% for item in top_products %}
+        <a href="{% if item.product_type == 'plant' %}{{ url_for('plant_detail', id=item.id) }}{% elif item.product_type == 'accessory' %}{{ url_for('accessory_detail', id=item.id) }}{% else %}{{ url_for('food_detail', id=item.id) }}{% endif %}" class="top-product-card">
+            <div class="top-product-image">
+                <img src="{{ item.image }}" alt="{{ item.name }}" loading="lazy">
+            </div>
+            <div class="top-product-info">
+                <h3 class="top-product-name">{{ item.name }}</h3>
+                <span class="top-product-price">LKR {{ "%.2f"|format(item.price) }}</span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="about-section">
+    <h2 class="section-title">About AquaStore</h2>
+    <div class="about-content">
+        <p>AquaStore is your trusted destination for everything aquarium-related. We offer a curated selection of aquatic plants, quality accessories, and premium fish food to help you create and maintain a thriving underwater ecosystem.</p>
+        <p>Whether you're a beginner or an experienced aquarist, our products are chosen for their quality and reliability. We're committed to helping you build the aquarium of your dreams.</p>
+    </div>
+</section>
+
+<style>
+.explore-cards {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 2rem;
+    min-height: 50vh;
+    flex-wrap: wrap;
+}
+.explore-card {
+    display: block;
+    cursor: pointer;
+    background: #fff;
+    border-radius: 24px;
+    padding: 4rem 3.5rem;
+    min-width: 360px;
+    max-width: 420px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    text-decoration: none;
+    transition: all 0.2s ease;
+    color: inherit;
+}
+.explore-card:hover {
+    border-color: var(--aqua-500);
+    box-shadow: 0 12px 32px rgba(6, 182, 212, 0.2);
+}
+.explore-card-icon {
+    font-size: 5.5rem;
+    margin-bottom: 2rem;
+}
+.explore-card-title {
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: var(--slate-900);
+    margin-bottom: 0.75rem;
+}
+.explore-card-desc {
+    font-size: 1.125rem;
+    color: var(--slate-600);
+    line-height: 1.5;
+}
+.explore-card-btn {
+    display: inline-block;
+    margin-top: 1.25rem;
+    padding: 0.6rem 1.5rem;
+    background: linear-gradient(135deg, var(--aqua-600), var(--aqua-500));
+    color: white !important;
+    font-weight: 600;
+    font-size: 1rem;
+    border-radius: 10px;
+    transition: all 0.2s ease;
+}
+.explore-card:hover .explore-card-btn {
+    box-shadow: 0 4px 14px rgba(6, 182, 212, 0.4);
+}
+.top-selling-section {
+    margin-top: 4rem;
+    padding-top: 2rem;
+}
+.section-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--slate-900);
+    text-align: center;
+    margin-bottom: 0.5rem;
+}
+.section-subtitle {
+    text-align: center;
+    color: var(--slate-600);
+    font-size: 1rem;
+    margin-bottom: 2rem;
+}
+.top-products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1.25rem;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+.top-product-card {
+    display: block;
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    transition: box-shadow 0.2s, border-color 0.2s;
+}
+.top-product-card:hover {
+    border-color: var(--aqua-500);
+    box-shadow: 0 8px 24px rgba(6, 182, 212, 0.12);
+}
+.top-product-image {
+    aspect-ratio: 1;
+    background: #f1f5f9;
+    overflow: hidden;
+}
+.top-product-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.top-product-info {
+    padding: 1rem;
+}
+.top-product-name {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--slate-900);
+    margin-bottom: 0.25rem;
+    line-height: 1.3;
+}
+.top-product-price {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--aqua-600);
+}
+.about-section {
+    margin-top: 4rem;
+    padding-top: 2rem;
+}
+.about-section .section-title {
+    margin-bottom: 1.5rem;
+}
+.about-content {
+    max-width: 720px;
+    margin: 0 auto;
+}
+.about-content p {
+    color: var(--slate-600);
+    line-height: 1.7;
+    margin-bottom: 1rem;
+}
+.about-content p:last-child {
+    margin-bottom: 0;
+}
+</style>
+{% endblock %}
