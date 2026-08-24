@@ -1,0 +1,24 @@
+<p class="form-hint">{{ 'Upload new images to replace existing ones. Empty slots keep the current image.' if is_edit else 'Add up to three product photos. The first image is used as the main listing thumbnail.' }}</p>
+<div class="image-upload-grid">
+    {% set slot_labels = ['Primary', 'Gallery', 'Gallery'] %}
+    {% for slot in [1, 2, 3] %}
+    {% set has_key = 'has_image' ~ slot %}
+    <div class="image-upload-slot{% if slot == 1 %} image-upload-slot--primary{% endif %}">
+        <input type="file" name="image{{ slot }}" accept="image/*" id="img{{ slot }}" class="image-file-input">
+        <button type="button" class="image-upload-drop" onclick="document.getElementById('img{{ slot }}').click()" ondrop="handleImageDrop(event, {{ slot }})" ondragover="event.preventDefault()">
+            <span class="image-preview" id="preview{{ slot }}">
+                {% if item.get(has_key) and item.id %}
+                <img src="{{ url_for(image_route, id=item.id, slot=slot) }}" alt="Image {{ slot }}">
+                <span class="image-preview-label">Current</span>
+                {% else %}
+                <span class="image-placeholder">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                    <span>Image {{ slot }}</span>
+                </span>
+                {% endif %}
+            </span>
+        </button>
+        <span class="image-slot-label">{{ slot_labels[slot - 1] }}</span>
+    </div>
+    {% endfor %}
+</div>

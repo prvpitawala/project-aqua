@@ -68,8 +68,9 @@
 }
 .detail-desc {
     color: var(--slate-600);
-    line-height: 1.6;
+    line-height: 1.7;
     margin-bottom: 1.5rem;
+    white-space: pre-line;
 }
 .btn-add-detail {
     display: inline-flex;
@@ -103,7 +104,7 @@
         <span class="detail-stock detail-stock-out">Out of stock</span>
         {% endif %}
         <div class="detail-price">LKR {{ "%.2f"|format(item.price) }}</div>
-        <p class="detail-desc">{{ item.description }}</p>
+        <div class="detail-desc">{{ item.description }}</div>
         {% if item.in_stock | default(true) %}
         <button type="button" class="btn-add-detail" data-name="{{ item.name }}" data-price="{{ item.price }}" data-image="{{ item.image }}" data-weight="{{ item.weight or 0 }}" onclick="AquaCart.add(this.dataset.name, parseFloat(this.dataset.price), this.dataset.image || '', this.dataset.weight)">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 2a1 1 0 0 0-.9.6L2.2 9.4A1 1 0 0 0 3 11h1.4l1.8 9.2a1 1 0 0 0 1 .8h9.6a1 1 0 0 0 1-.8L18.6 11H21a1 1 0 0 0 .8-1.6L18.9 2.6A1 1 0 0 0 18 2H6zm3.2 9h5.6l-1.2 6H10.4L9.2 11z"/></svg>

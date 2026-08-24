@@ -276,6 +276,28 @@ def _get_item_by_id(table, item_id):
         return None
 
 
+def _update_item_images(table, item_id, images):
+    """Update image blobs for slots that received a new upload."""
+    if not images:
+        return True
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            for slot in (1, 2, 3):
+                pair = images[slot - 1] if len(images) >= slot else (None, None)
+                data, mime = pair if pair else (None, None)
+                if data:
+                    cur.execute(
+                        f"UPDATE {table} SET image{slot}=%s, image{slot}_type=%s WHERE id=%s",
+                        (data, mime, item_id),
+                    )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
 def _update_item(table, item_id, name, price, category, description, weight=None, in_stock=True):
     """Update a tool or food row."""
     try:

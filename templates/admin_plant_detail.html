@@ -14,7 +14,7 @@
 .detail-stock-in { background: #d1fae5; color: #065f46; }
 .detail-stock-out { background: #fee2e2; color: #b91c1c; }
 .detail-price { font-size: 1.5rem; font-weight: 700; color: var(--aqua-600); margin-bottom: 1rem; }
-.detail-desc { color: var(--slate-600); line-height: 1.6; margin-bottom: 1.5rem; }
+.detail-desc { color: var(--slate-600); line-height: 1.7; margin-bottom: 1.5rem; white-space: pre-line; }
 .btn-edit-detail { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; background: linear-gradient(135deg, var(--aqua-600), var(--aqua-500)); color: white; border: none; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; font-family: inherit; text-decoration: none; }
 .btn-edit-detail:hover { opacity: 0.9; }
 .detail-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
@@ -50,7 +50,7 @@
         <span class="detail-stock detail-stock-out">Out of stock</span>
         {% endif %}
         <div class="detail-price">LKR {{ "%.2f"|format(plant.price) }}</div>
-        <p class="detail-desc">{{ plant.description or 'No description.' }}</p>
+        <div class="detail-desc">{{ plant.description or 'No description.' }}</div>
         <a href="{{ url_for('admin_plants_edit', id=plant.id) }}" class="btn-edit-detail">Edit plant</a>
     </div>
 </div>

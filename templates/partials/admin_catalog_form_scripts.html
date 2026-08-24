@@ -1,0 +1,27 @@
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    [1, 2, 3].forEach(function(slot) {
+        var inp = document.getElementById('img' + slot);
+        var prev = document.getElementById('preview' + slot);
+        if (!inp || !prev) return;
+        inp.addEventListener('change', function() {
+            var f = this.files[0];
+            if (!f || !f.type.startsWith('image/')) return;
+            prev.innerHTML = '<img src="' + URL.createObjectURL(f) + '" alt="Preview"><span class="image-preview-label">New</span>';
+        });
+    });
+});
+function handleImageDrop(e, slot) {
+    e.preventDefault();
+    var f = e.dataTransfer && e.dataTransfer.files[0];
+    if (!f || !f.type.startsWith('image/')) return;
+    var inp = document.getElementById('img' + slot);
+    var prev = document.getElementById('preview' + slot);
+    if (inp && prev) {
+        var dt = new DataTransfer();
+        dt.items.add(f);
+        inp.files = dt.files;
+        prev.innerHTML = '<img src="' + URL.createObjectURL(f) + '" alt="Preview"><span class="image-preview-label">New</span>';
+    }
+}
+</script>

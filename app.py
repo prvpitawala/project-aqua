@@ -369,14 +369,62 @@ def _ensure_plant_images(plants):
     _attach_catalog_images(plants, 'serve_plant_image')
 
 
-@app.route('/admin/plants', methods=['GET', 'POST'])
+def _blank_catalog_item():
+    return {
+        'id': None,
+        'name': '',
+        'price': 0,
+        'category': '',
+        'weight': '',
+        'description': '',
+        'in_stock': True,
+        'care_level': '',
+        'co2_condition': '',
+        'light_condition': '',
+        'has_image1': False,
+        'has_image2': False,
+        'has_image3': False,
+    }
+
+
+def _read_form_images():
+    img1, img1_type = _read_uploaded_image('image1')
+    img2, img2_type = _read_uploaded_image('image2')
+    img3, img3_type = _read_uploaded_image('image3')
+    return ((img1, img1_type), (img2, img2_type), (img3, img3_type))
+
+
+def _parse_catalog_form_fields():
+    try:
+        price = float(request.form.get('price', 0) or 0)
+    except ValueError:
+        price = 0.0
+    return {
+        'name': request.form.get('name', '').strip(),
+        'price': price,
+        'category': request.form.get('category', '').strip(),
+        'weight': request.form.get('weight', '').strip(),
+        'description': request.form.get('description', '').strip(),
+        'in_stock': request.form.get('in_stock') == '1',
+        'care_level': request.form.get('care_level', '').strip() or None,
+        'co2_condition': request.form.get('co2_condition', '').strip() or None,
+        'light_condition': request.form.get('light_condition', '').strip() or None,
+    }
+
+
+def _admin_list_flash_message(item_label):
+    if request.args.get('updated'):
+        return f'{item_label} updated successfully.', 'success'
+    if request.args.get('added'):
+        return f'{item_label} added successfully.', 'success'
+    return None, 'success'
+
+
+@app.route('/admin/plants', methods=['GET'])
 @admin_required
 def admin_plants():
-    from models import add_plant, get_plants
-    message = 'Plant updated successfully.' if request.args.get('updated') else None
-    message_type = 'success'
-    if request.method == 'POST' and message is None:
-        message, message_type = _process_admin_add_form(add_plant, 'Plant')
+    from models import get_plants
+    message, message_type = _admin_list_flash_message('Plant')
     co2 = request.args.getlist('co2')
     light = request.args.getlist('light')
     stock = request.args.getlist('stock')
@@ -413,57 +461,67 @@ def admin_plant_detail(id):
     return render_template('admin_plant_detail.html', plant=plant)
 
 
-@app.route('/admin/plants/<int:id>/json')
+def _save_plant_form(item_id=None):
+    """Process plant create/edit form. Returns redirect response or (item, message, message_type) for re-render."""
+    from models import add_plant, update_plant, _update_item_images
+    form_data = _parse_catalog_form_fields()
+    if not form_data['name'] or not form_data['category']:
+        item = dict(_blank_catalog_item(), **{k: form_data.get(k, '') for k in ('name', 'category', 'weight', 'description')})
+        item['price'] = form_data['price']
+        item['in_stock'] = form_data['in_stock']
+        item['care_level'] = form_data.get('care_level') or ''
+        item['co2_condition'] = form_data.get('co2_condition') or ''
+        item['light_condition'] = form_data.get('light_condition') or ''
+        return item, MSG_NAME_CATEGORY_REQUIRED, 'error'
+    images = _read_form_images()
+    if item_id:
+        if not update_plant(item_id, **form_data):
+            merged = dict(_blank_catalog_item(), **form_data)
+            merged['id'] = item_id
+            merged['care_level'] = form_data.get('care_level') or ''
+            merged['co2_condition'] = form_data.get('co2_condition') or ''
+            merged['light_condition'] = form_data.get('light_condition') or ''
+            return merged, 'Failed to update plant.', 'error'
+        _update_item_images('plants', item_id, images)
+        return redirect(url_for('admin_plants') + QUERY_UPDATED)
+    new_id, err = add_plant(
+        form_data['name'], form_data['price'], form_data['category'], form_data['description'],
+        images=images, weight=form_data['weight'], in_stock=form_data['in_stock'],
+        care_level=form_data['care_level'], co2_condition=form_data['co2_condition'],
+        light_condition=form_data['light_condition'],
+    )
+    if new_id:
+        return redirect(url_for('admin_plants') + '?added=1')
+    fail_msg = f'Failed to add plant: {err}' if err else 'Failed to add plant. Check database connection.'
+    item = dict(_blank_catalog_item(), **form_data)
+    item['care_level'] = form_data.get('care_level') or ''
+    item['co2_condition'] = form_data.get('co2_condition') or ''
+    item['light_condition'] = form_data.get('light_condition') or ''
+    return item, fail_msg, 'error'
+
+
+@app.route('/admin/plants/new', methods=['GET', 'POST'])
 @admin_required
-def admin_plant_json(id):
-    """Return plant data as JSON for the edit modal."""
-    from models import get_plant_by_id
-    plant = get_plant_by_id(id)
-    if not plant:
-        return jsonify({'error': 'Plant not found'}), 404
-    out = {
-        'id': plant['id'],
-        'name': plant.get('name', ''),
-        'price': float(plant.get('price', 0)),
-        'category': plant.get('category', ''),
-        'weight': plant.get('weight') or '',
-        'description': plant.get('description') or '',
-        'care_level': plant.get('care_level') or '',
-        'co2_condition': plant.get('co2_condition') or '',
-        'light_condition': plant.get('light_condition') or '',
-        'in_stock': bool(plant.get('in_stock', True)),
-        'has_image1': bool(plant.get('has_image1')),
-        'has_image2': bool(plant.get('has_image2')),
-        'has_image3': bool(plant.get('has_image3')),
-    }
-    return jsonify(out)
-
-
-def _parse_plant_edit_form():
-    """Parse plant edit form. Returns (form_data_dict, redirect_url, is_ajax)."""
-    try:
-        price = float(request.form.get('price', 0) or 0)
-    except ValueError:
-        price = 0.0
-    return {
-        'name': request.form.get('name', '').strip(),
-        'price': price,
-        'category': request.form.get('category', '').strip(),
-        'weight': request.form.get('weight', '').strip(),
-        'description': request.form.get('description', '').strip(),
-        'in_stock': request.form.get('in_stock') == '1',
-        'care_level': request.form.get('care_level', '').strip() or None,
-        'co2_condition': request.form.get('co2_condition', '').strip() or None,
-        'light_condition': request.form.get('light_condition', '').strip() or None,
-    }, url_for('admin_plants') + QUERY_UPDATED, request.headers.get('X-Requested-With') == 'XMLHttpRequest'
-
-
-def _apply_plant_edit_response(plant_id, form_data, redirect_url, is_ajax):
-    """Apply plant edit and return response. Returns response or None."""
-    from models import update_plant
-    if not update_plant(plant_id, **form_data):
-        return None
-    return jsonify({'success': True, 'redirect': redirect_url}) if is_ajax else redirect(redirect_url)
+def admin_plants_new():
+    if request.method == 'POST':
+        result = _save_plant_form()
+        if isinstance(result, tuple) and len(result) == 3:
+            item, message, message_type = result
+            return render_template(
+                'admin_plant_edit.html',
+                item=item,
+                is_edit=False,
+                form_action=url_for('admin_plants_new'),
+                message=message,
+                message_type=message_type,
+            )
+        return result
+    return render_template(
+        'admin_plant_edit.html',
+        item=_blank_catalog_item(),
+        is_edit=False,
+        form_action=url_for('admin_plants_new'),
+    )
 
 
 @app.route('/admin/plants/<int:id>/edit', methods=['GET', 'POST'])
@@ -474,41 +532,53 @@ def admin_plants_edit(id):
     if not plant:
         return redirect(url_for('admin_plants'))
     if request.method == 'POST':
-        form_data, redirect_url, is_ajax = _parse_plant_edit_form()
-        response = _apply_plant_edit_response(id, form_data, redirect_url, is_ajax)
-        if response is not None:
-            return response
-    return render_template('admin_plant_edit.html', item=plant)
+        result = _save_plant_form(id)
+        if isinstance(result, tuple) and len(result) == 3:
+            item, message, message_type = result
+            return render_template(
+                'admin_plant_edit.html',
+                item=item or plant,
+                is_edit=True,
+                form_action=url_for('admin_plants_edit', id=id),
+                message=message,
+                message_type=message_type,
+            )
+        return result
+    return render_template(
+        'admin_plant_edit.html',
+        item=plant,
+        is_edit=True,
+        form_action=url_for('admin_plants_edit', id=id),
+    )
 
 
-def _process_admin_add_form(add_fn, item_name):
-    """Process add-item form POST. Returns (message, message_type) tuple."""
-    name = request.form.get('name', '').strip()
-    category = request.form.get('category', '').strip()
-    if not name or not category:
-        return (MSG_NAME_CATEGORY_REQUIRED, 'error')
-    try:
-        price_f = float(request.form.get('price', 0) or 0)
-    except ValueError:
-        price_f = 0.0
-    description = request.form.get('description', '').strip()
-    weight = request.form.get('weight', '').strip()
-    in_stock = request.form.get('in_stock') == '1'
-    care_level = request.form.get('care_level', '').strip() or None
-    co2_condition = request.form.get('co2_condition', '').strip() or None
-    light_condition = request.form.get('light_condition', '').strip() or None
-    img1, img1_type = _read_uploaded_image('image1')
-    img2, img2_type = _read_uploaded_image('image2')
-    img3, img3_type = _read_uploaded_image('image3')
-    images = ((img1, img1_type), (img2, img2_type), (img3, img3_type))
-    if add_fn.__name__ == 'add_plant':
-        new_id, err = add_fn(name, price_f, category, description, images=images, weight=weight, in_stock=in_stock, care_level=care_level, co2_condition=co2_condition, light_condition=light_condition)
-    else:
-        new_id, err = add_fn(name, price_f, category, description, img1, img1_type, img2, img2_type, img3, img3_type, weight, in_stock)
+def _save_tool_food_form(table, add_fn, update_fn, list_route, edit_template, item_id=None):
+    """Process tool/food create/edit form."""
+    from models import _update_item_images
+    form_data = _parse_catalog_form_fields()
+    plant_fields = {k: form_data[k] for k in ('name', 'price', 'category', 'weight', 'description', 'in_stock')}
+    if not plant_fields['name'] or not plant_fields['category']:
+        item = dict(_blank_catalog_item(), **plant_fields)
+        return item, MSG_NAME_CATEGORY_REQUIRED, 'error'
+    img1, t1 = _read_uploaded_image('image1')
+    img2, t2 = _read_uploaded_image('image2')
+    img3, t3 = _read_uploaded_image('image3')
+    images = ((img1, t1), (img2, t2), (img3, t3))
+    if item_id:
+        if not update_fn(item_id, **plant_fields):
+            merged = dict(_blank_catalog_item(), **plant_fields)
+            merged['id'] = item_id
+            return merged, f'Failed to update {table[:-1]}.', 'error'
+        _update_item_images(table, item_id, images)
+        return redirect(list_route + QUERY_UPDATED)
+    new_id, err = add_fn(
+        plant_fields['name'], plant_fields['price'], plant_fields['category'], plant_fields['description'],
+        img1, t1, img2, t2, img3, t3, plant_fields['weight'], plant_fields['in_stock'],
+    )
     if new_id:
-        return (f'{item_name} "{name}" added successfully.', 'success')
-    fail_msg = f'Failed to add {item_name.lower()}: {err}' if err else f'Failed to add {item_name.lower()}. Check database connection.'
-    return (fail_msg, 'error')
+        return redirect(list_route + '?added=1')
+    fail_msg = f'Failed to add {table[:-1]}: {err}' if err else f'Failed to add {table[:-1]}. Check database connection.'
+    return dict(_blank_catalog_item(), **plant_fields), fail_msg, 'error'
 
 
 def _read_uploaded_image(field_name):
@@ -535,14 +605,11 @@ def serve_plant_image(id, slot):
     return Response(data, mimetype=mime or MIME_JPEG)
 
 
-@app.route('/admin/tools', methods=['GET', 'POST'])
+@app.route('/admin/tools', methods=['GET'])
 @admin_required
 def admin_tools():
-    from models import add_tool, get_tools
-    message = 'Tool updated successfully.' if request.args.get('updated') else None
-    message_type = 'success'
-    if request.method == 'POST' and message is None:
-        message, message_type = _process_admin_add_form(add_tool, 'Tool')
+    from models import get_tools
+    message, message_type = _admin_list_flash_message('Tool')
     stock = request.args.getlist('stock')
     categories = request.args.getlist('category')
     items = _filter_by_category(get_tools(), categories)
@@ -565,29 +632,61 @@ def admin_tools():
     )
 
 
+@app.route('/admin/tools/new', methods=['GET', 'POST'])
+@admin_required
+def admin_tools_new():
+    from models import add_tool, update_tool
+    if request.method == 'POST':
+        result = _save_tool_food_form('tools', add_tool, update_tool, url_for('admin_tools'), 'admin_tool_edit.html')
+        if isinstance(result, tuple) and len(result) == 3:
+            item, message, message_type = result
+            return render_template(
+                'admin_tool_edit.html',
+                item=item,
+                is_edit=False,
+                form_action=url_for('admin_tools_new'),
+                image_route='serve_tool_image',
+                message=message,
+                message_type=message_type,
+            )
+        return result
+    return render_template(
+        'admin_tool_edit.html',
+        item=_blank_catalog_item(),
+        is_edit=False,
+        form_action=url_for('admin_tools_new'),
+        image_route='serve_tool_image',
+    )
+
+
 @app.route('/admin/tools/<int:id>/edit', methods=['GET', 'POST'])
 @admin_required
 def admin_tools_edit(id):
-    from models import get_tool_by_id, update_tool
+    from models import add_tool, get_tool_by_id, update_tool
     item = get_tool_by_id(id)
     if not item:
         return redirect(url_for('admin_tools'))
     if request.method == 'POST':
-        try:
-            price = float(request.form.get('price', 0) or 0)
-        except ValueError:
-            price = 0.0
-        update_tool(
-            id,
-            request.form.get('name', '').strip(),
-            price,
-            request.form.get('category', '').strip(),
-            request.form.get('description', '').strip(),
-            request.form.get('weight', '').strip(),
-            request.form.get('in_stock') == '1',
-        )
-        return redirect(url_for('admin_tools') + QUERY_UPDATED)
-    return render_template('admin_tool_edit.html', item=item)
+        result = _save_tool_food_form('tools', add_tool, update_tool, url_for('admin_tools'), 'admin_tool_edit.html', id)
+        if isinstance(result, tuple) and len(result) == 3:
+            err_item, message, message_type = result
+            return render_template(
+                'admin_tool_edit.html',
+                item=err_item or item,
+                is_edit=True,
+                form_action=url_for('admin_tools_edit', id=id),
+                image_route='serve_tool_image',
+                message=message,
+                message_type=message_type,
+            )
+        return result
+    return render_template(
+        'admin_tool_edit.html',
+        item=item,
+        is_edit=True,
+        form_action=url_for('admin_tools_edit', id=id),
+        image_route='serve_tool_image',
+    )
 
 
 @app.route('/admin/tools/<int:id>/image/<int:slot>')
@@ -600,14 +699,11 @@ def serve_tool_image(id, slot):
     return Response(data, mimetype=mime or MIME_JPEG)
 
 
-@app.route('/admin/foods', methods=['GET', 'POST'])
+@app.route('/admin/foods', methods=['GET'])
 @admin_required
 def admin_foods():
-    from models import add_food, get_foods
-    message = 'Food updated successfully.' if request.args.get('updated') else None
-    message_type = 'success'
-    if request.method == 'POST' and message is None:
-        message, message_type = _process_admin_add_form(add_food, 'Food')
+    from models import get_foods
+    message, message_type = _admin_list_flash_message('Food')
     stock = request.args.getlist('stock')
     categories = request.args.getlist('category')
     items = _filter_by_category(get_foods(), categories)
@@ -630,29 +726,61 @@ def admin_foods():
     )
 
 
+@app.route('/admin/foods/new', methods=['GET', 'POST'])
+@admin_required
+def admin_foods_new():
+    from models import add_food, update_food
+    if request.method == 'POST':
+        result = _save_tool_food_form('foods', add_food, update_food, url_for('admin_foods'), 'admin_food_edit.html')
+        if isinstance(result, tuple) and len(result) == 3:
+            item, message, message_type = result
+            return render_template(
+                'admin_food_edit.html',
+                item=item,
+                is_edit=False,
+                form_action=url_for('admin_foods_new'),
+                image_route='serve_food_image',
+                message=message,
+                message_type=message_type,
+            )
+        return result
+    return render_template(
+        'admin_food_edit.html',
+        item=_blank_catalog_item(),
+        is_edit=False,
+        form_action=url_for('admin_foods_new'),
+        image_route='serve_food_image',
+    )
+
+
 @app.route('/admin/foods/<int:id>/edit', methods=['GET', 'POST'])
 @admin_required
 def admin_foods_edit(id):
-    from models import get_food_by_id, update_food
+    from models import add_food, get_food_by_id, update_food
     item = get_food_by_id(id)
     if not item:
         return redirect(url_for('admin_foods'))
     if request.method == 'POST':
-        try:
-            price = float(request.form.get('price', 0) or 0)
-        except ValueError:
-            price = 0.0
-        update_food(
-            id,
-            request.form.get('name', '').strip(),
-            price,
-            request.form.get('category', '').strip(),
-            request.form.get('description', '').strip(),
-            request.form.get('weight', '').strip(),
-            request.form.get('in_stock') == '1',
-        )
-        return redirect(url_for('admin_foods') + QUERY_UPDATED)
-    return render_template('admin_food_edit.html', item=item)
+        result = _save_tool_food_form('foods', add_food, update_food, url_for('admin_foods'), 'admin_food_edit.html', id)
+        if isinstance(result, tuple) and len(result) == 3:
+            err_item, message, message_type = result
+            return render_template(
+                'admin_food_edit.html',
+                item=err_item or item,
+                is_edit=True,
+                form_action=url_for('admin_foods_edit', id=id),
+                image_route='serve_food_image',
+                message=message,
+                message_type=message_type,
+            )
+        return result
+    return render_template(
+        'admin_food_edit.html',
+        item=item,
+        is_edit=True,
+        form_action=url_for('admin_foods_edit', id=id),
+        image_route='serve_food_image',
+    )
 
 
 @app.route('/admin/foods/<int:id>/image/<int:slot>')

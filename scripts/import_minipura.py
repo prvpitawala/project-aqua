@@ -101,12 +101,98 @@ def get_connection():
     )
 
 
+_EMOJI_RE = re.compile(
+    "["
+    "\U0001F300-\U0001FAFF"
+    "\U00002700-\U000027BF"
+    "\U0001F600-\U0001F64F"
+    "\uFE0F"
+    "\u200D"
+    "]+",
+    flags=re.UNICODE,
+)
+
+
+def strip_emojis(text: str) -> str:
+    if not text:
+        return ""
+    return _EMOJI_RE.sub("", text)
+
+
 def strip_html(text: str) -> str:
     if not text:
         return ""
     text = html.unescape(text)
     text = re.sub(r"<[^>]+>", " ", text)
     return re.sub(r"\s+", " ", text).strip()
+
+
+def html_to_formatted_text(text: str) -> str:
+    """Convert HTML to readable plain text with paragraph and list line breaks."""
+    if not text:
+        return ""
+
+    text = html.unescape(text)
+    text = re.sub(r"<\s*br\s*/?>", "\n", text, flags=re.I)
+    text = re.sub(r"</\s*(p|div|h[1-6]|li|tr|blockquote)\s*>", "\n", text, flags=re.I)
+    text = re.sub(r"<\s*li[^>]*>", "• ", text, flags=re.I)
+    text = re.sub(r"<[^>]+>", "", text)
+
+    lines: list[str] = []
+    prev_blank = False
+    for raw_line in text.splitlines():
+        line = strip_emojis(re.sub(r"[ \t]+", " ", raw_line).strip())
+        if not line:
+            if not prev_blank:
+                lines.append("")
+            prev_blank = True
+            continue
+        lines.append(line)
+        prev_blank = False
+
+    return "\n".join(lines).strip()
+
+
+def build_product_description(product: dict, max_length: int = 4000) -> str:
+    """Build a unique description, preferring the store's full product text."""
+    long_desc = html_to_formatted_text(product.get("description", ""))
+    short_desc = html_to_formatted_text(product.get("short_description", ""))
+    name = strip_html(product.get("name", ""))
+
+    if len(long_desc) >= 120:
+        return long_desc[:max_length]
+
+    parts: list[str] = []
+    if name:
+        parts.append(name + ".")
+    if short_desc:
+        parts.append(short_desc)
+    if long_desc and long_desc not in short_desc:
+        parts.append(long_desc)
+
+    combined = "\n\n".join(parts).strip()
+    if len(combined) >= 80:
+        return combined[:max_length]
+
+    extras: list[str] = []
+    tags = tag_slugs(product)
+    co2 = pick_tag_value(tags, CO2_TAGS)
+    light = pick_tag_value(tags, LIGHT_TAGS)
+    care = pick_care_level(product)
+    weight = pick_weight(product)
+    if co2:
+        extras.append(co2)
+    if light:
+        extras.append(light)
+    if care:
+        extras.append(care)
+    if weight:
+        extras.append(f"Pack size: {weight}")
+
+    fallback = f"{name}.\n\nQuality aquarium product available at Minipura Aqua, Sri Lanka."
+    if extras:
+        fallback += "\n\n" + "\n".join(f"• {item}" for item in extras)
+    return fallback[:max_length]
 
 
 def safe_print(message: str) -> None:
@@ -272,7 +358,7 @@ def insert_plant(cur, product: dict, image_data: bytes, image_type: str) -> None
             price_lkr(product),
             pick_plant_category(product),
             pick_weight(product),
-            strip_html(product.get("short_description") or product.get("description", ""))[:2000],
+            build_product_description(product),
             pick_care_level(product),
             pick_tag_value(tags, CO2_TAGS),
             pick_tag_value(tags, LIGHT_TAGS),
@@ -296,7 +382,7 @@ def insert_tool(cur, product: dict, image_data: bytes, image_type: str) -> None:
             price_lkr(product),
             pick_tool_category(product),
             pick_weight(product),
-            strip_html(product.get("short_description") or product.get("description", ""))[:2000],
+            build_product_description(product),
             image_data,
             image_type,
             1 if product.get("is_in_stock") else 0,
@@ -318,7 +404,7 @@ def insert_food(cur, product: dict, image_data: bytes, image_type: str) -> None:
             price_lkr(product),
             pick_food_category(name),
             pick_weight(product),
-            strip_html(product.get("short_description") or product.get("description", ""))[:2000],
+            build_product_description(product),
             image_data,
             image_type,
             1 if product.get("is_in_stock") else 0,

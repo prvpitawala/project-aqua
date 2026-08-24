@@ -37,6 +37,7 @@
     min-height: 220px; cursor: pointer; border: 2px dashed var(--aqua-400);
     background: rgba(6, 182, 212, 0.06); color: var(--aqua-600);
     font: inherit; padding: 0; margin: 0; text-align: center;
+    text-decoration: none;
 }
 .add-new-card:hover { background: rgba(6, 182, 212, 0.12); border-color: var(--aqua-500); }
 .add-new-card .add-icon { font-size: 3rem; margin-bottom: 0.5rem; line-height: 1; }
@@ -45,45 +46,11 @@
 .alert-success { background: #d1fae5; color: #065f46; }
 .alert-error { background: #fee2e2; color: #b91c1c; }
 .no-image { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--slate-500); font-size: 0.875rem; }
-.add-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); align-items: center; justify-content: center; z-index: 1000; padding: 1.5rem; border: none; font: inherit; cursor: default; }
-.add-modal-overlay.show { display: flex; }
-.add-modal { background: #fff; border-radius: 16px; max-width: 560px; width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.15); }
-.add-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 1px solid #e2e8f0; }
-.add-modal-header h2 { font-size: 1.25rem; font-weight: 700; margin: 0; }
-.add-modal-close { width: 36px; height: 36px; background: #f1f5f9; border: none; border-radius: 10px; font-size: 1.25rem; cursor: pointer; color: var(--slate-600); }
-.add-modal-body { padding: 1.5rem; }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-.form-group { margin-bottom: 1rem; }
-.form-group label { display: block; margin-bottom: 0.4rem; font-weight: 600; font-size: 0.875rem; color: var(--slate-800); }
-.form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.6rem 0.9rem; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 0.9375rem; font-family: inherit; }
-.form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--aqua-500); }
 .stock-badge { display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 6px; margin-top: 0.35rem; }
 .stock-badge-in { background: #d1fae5; color: #065f46; }
 .stock-badge-out { background: #fee2e2; color: #b91c1c; }
-.image-fieldset { border: none; padding: 0; margin: 0; }
-.image-fieldset legend { display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 0.875rem; color: var(--slate-800); }
-.image-upload-section label { margin-bottom: 0.25rem; }
-.image-upload-hint { font-size: 0.8125rem; color: var(--slate-500); margin-bottom: 1rem; }
-.image-upload-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
-.image-upload-slot { position: relative; }
-.image-file-input { display: none; }
-.image-upload-drop {
-    aspect-ratio: 1; border: 2px dashed #cbd5e1; border-radius: 14px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    background: linear-gradient(145deg, #f8fafc 0%, #f1f5f9 100%); transition: all 0.25s ease;
-    overflow: hidden; position: relative; min-height: 100px;
-    padding: 0; font: inherit; width: 100%;
-}
-.image-upload-drop:hover { border-color: var(--aqua-400); background: linear-gradient(145deg, rgba(6, 182, 212, 0.06) 0%, rgba(6, 182, 212, 0.12) 100%); }
-.image-preview { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: absolute; inset: 0; }
-.image-preview img { width: 100%; height: 100%; object-fit: cover; }
-.image-placeholder { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; color: var(--slate-500); font-size: 0.75rem; font-weight: 500; }
-.image-placeholder svg { opacity: 0.6; }
-.image-preview-label { position: absolute; bottom: 6px; right: 6px; background: rgba(0,0,0,0.6); color: #fff; font-size: 0.625rem; padding: 0.2rem 0.4rem; border-radius: 6px; }
-.image-upload-slot:first-child .image-upload-drop { border-color: var(--aqua-400); background: linear-gradient(145deg, rgba(6, 182, 212, 0.04) 0%, rgba(6, 182, 212, 0.08) 100%); }
-.btn-submit { width: 100%; padding: 0.75rem; background: linear-gradient(135deg, var(--aqua-600), var(--aqua-500)); color: white; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; font-family: inherit; }
-.btn-submit:hover { opacity: 0.9; }
-@media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } .shop-sidebar { display: none; } .image-upload-grid { grid-template-columns: 1fr; } }
+.product-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0 1rem 1rem; margin-top: auto; }
+@media (max-width: 640px) { .shop-sidebar { display: none; } }
 </style>
 {% endblock %}
 
@@ -126,14 +93,14 @@
     <div class="products-section">
         <div class="products-grid">
             {% if page == 1 %}
-            <button type="button" class="product-card add-new-card" onclick="openAddModal()">
+            <a href="{{ url_for('admin_foods_new') }}" class="product-card add-new-card">
                 <span class="add-icon">+</span>
                 <span class="add-text">Add New Food</span>
-            </button>
+            </a>
             {% endif %}
             {% for item in items %}
             <div class="product-card">
-                <div class="product-card-link">
+                <a href="{{ url_for('food_detail', id=item.id) }}" class="product-card-link">
                     <div class="product-image">
                         {% if item.image %}
                         <img src="{{ item.image }}" alt="{{ item.name }}" loading="lazy">
@@ -145,11 +112,11 @@
                         <div class="product-name">{{ item.name }}</div>
                         <span class="product-category">{{ item.category }}{% if item.weight %} · {{ item.weight }}{% endif %}</span>
                         <span class="stock-badge stock-badge-{{ 'in' if item.in_stock else 'out' }}">{{ 'In stock' if item.in_stock else 'Out of stock' }}</span>
-                        <div class="product-info-row">
-                            <span class="product-price">LKR {{ "%.2f"|format(item.price) }}</span>
-                            <a href="{{ url_for('admin_foods_edit', id=item.id) }}" class="btn-edit">Edit</a>
-                        </div>
                     </div>
+                </a>
+                <div class="product-card-footer">
+                    <span class="product-price">LKR {{ "%.2f"|format(item.price) }}</span>
+                    <a href="{{ url_for('admin_foods_edit', id=item.id) }}" class="btn-edit">Edit</a>
                 </div>
             </div>
             {% endfor %}
@@ -158,98 +125,7 @@
     </div>
 </div>
 
-<div id="addModal" class="add-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="addModalTitle" onclick="if(event.target===this)closeAddModal()">
-    <div class="add-modal">
-        <div class="add-modal-header">
-            <h2 id="addModalTitle">Add New Food</h2>
-            <button type="button" class="add-modal-close" onclick="closeAddModal()" aria-label="Close">×</button>
-        </div>
-        <form method="post" action="{{ url_for('admin_foods') }}" enctype="multipart/form-data" class="add-modal-body">
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="name">Name *</label>
-                    <input type="text" id="name" name="name" required placeholder="e.g. Tropical Flakes">
-                </div>
-                <div class="form-group">
-                    <label for="price">Price (LKR) *</label>
-                    <input type="number" id="price" name="price" step="0.01" min="0" required placeholder="400">
-                </div>
-            </div>
-            <div class="form-group">
-                <label for="category">Category *</label>
-                <select id="category" name="category" required>
-                    <option value="">Select category</option>
-                    <option value="Flakes">Flakes</option>
-                    <option value="Pellets">Pellets</option>
-                    <option value="Freeze-dried">Freeze-dried</option>
-                    <option value="Treats">Treats</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="weight">Weight</label>
-                <input type="text" id="weight" name="weight" placeholder="e.g. 100 g, 0.5 kg">
-            </div>
-            <div class="form-group">
-                <label for="add_in_stock">Stock status</label>
-                <select id="add_in_stock" name="in_stock">
-                    <option value="1" selected>In stock</option>
-                    <option value="0">Out of stock</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="description">Description</label>
-                <textarea id="description" name="description" rows="3" placeholder="Food description..."></textarea>
-            </div>
-            <div class="form-group image-upload-section">
-                <fieldset class="image-fieldset">
-                    <legend>Product images (up to 3)</legend>
-                    <p class="image-upload-hint">Click or drag to upload. JPG, PNG, GIF, WebP.</p>
-                <div class="image-upload-grid">
-                    <div class="image-upload-slot">
-                        <input type="file" name="image1" accept="image/*" id="add_img1" class="image-file-input">
-                        <button type="button" class="image-upload-drop" onclick="document.getElementById('add_img1').click()" ondrop="handleAddDrop(event, 1)" ondragover="event.preventDefault()">
-                            <span class="image-preview" id="add_preview1">
-                                <span class="image-placeholder">
-                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                                    <span>Primary</span>
-                                </span>
-                            </span>
-                        </button>
-                    </div>
-                    <div class="image-upload-slot">
-                        <input type="file" name="image2" accept="image/*" id="add_img2" class="image-file-input">
-                        <button type="button" class="image-upload-drop" onclick="document.getElementById('add_img2').click()" ondrop="handleAddDrop(event, 2)" ondragover="event.preventDefault()">
-                            <span class="image-preview" id="add_preview2">
-                                <span class="image-placeholder">
-                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                                    <span>Gallery 2</span>
-                                </span>
-                            </span>
-                        </button>
-                    </div>
-                    <div class="image-upload-slot">
-                        <input type="file" name="image3" accept="image/*" id="add_img3" class="image-file-input">
-                        <button type="button" class="image-upload-drop" onclick="document.getElementById('add_img3').click()" ondrop="handleAddDrop(event, 3)" ondragover="event.preventDefault()">
-                            <span class="image-preview" id="add_preview3">
-                                <span class="image-placeholder">
-                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                                    <span>Gallery 3</span>
-                                </span>
-                            </span>
-                        </button>
-                    </div>
-                </div>
-                </fieldset>
-            </div>
-            <button type="submit" class="btn-submit">Add Food</button>
-        </form>
-    </div>
-</div>
-
 <script>
-function openAddModal() { document.getElementById('addModal').classList.add('show'); }
-function closeAddModal() { document.getElementById('addModal').classList.remove('show'); }
-document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeAddModal(); });
 function applyAdminFilters() {
     var stock = Array.prototype.map.call(document.querySelectorAll('.admin-filter-stock:checked'), function(cb) { return cb.value; });
     var params = new URLSearchParams(globalThis.location.search);
@@ -262,30 +138,5 @@ function applyAdminFilters() {
 document.querySelectorAll('.admin-filter-stock').forEach(function(cb) {
     cb.addEventListener('change', applyAdminFilters);
 });
-document.addEventListener('DOMContentLoaded', function() {
-    [1,2,3].forEach(function(slot) {
-        var inp = document.getElementById('add_img' + slot);
-        var prev = document.getElementById('add_preview' + slot);
-        if (!inp || !prev) return;
-        inp.addEventListener('change', function() {
-            var f = this.files[0];
-            if (!f || !f.type.startsWith('image/')) return;
-            prev.innerHTML = '<img src="' + URL.createObjectURL(f) + '" alt="Preview">';
-        });
-    });
-});
-function handleAddDrop(e, slot) {
-    e.preventDefault();
-    var f = e.dataTransfer && e.dataTransfer.files[0];
-    if (!f || !f.type.startsWith('image/')) return;
-    var inp = document.getElementById('add_img' + slot);
-    var prev = document.getElementById('add_preview' + slot);
-    if (inp && prev) {
-        var dt = new DataTransfer();
-        dt.items.add(f);
-        inp.files = dt.files;
-        prev.innerHTML = '<img src="' + URL.createObjectURL(f) + '" alt="Preview">';
-    }
-}
 </script>
 {% endblock %}
