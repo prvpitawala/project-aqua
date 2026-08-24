@@ -1,6 +1,10 @@
 """
 Seed the Aqua database with full demo data.
 
+Product names, descriptions, prices, and image URLs come from minipuraaqua.lk
+(see scripts/data/minipura_catalog.json). Images are downloaded from those URLs
+and stored in the database as blobs.
+
 Prerequisites:
   1. Run scripts/init_mysql.sql in phpMyAdmin or MySQL CLI
   2. Activate the virtual environment and install requirements
@@ -9,6 +13,9 @@ Usage:
   python scripts/seed.py --reset
   python scripts/seed.py --reset --no-images
   python scripts/seed.py --admin-user admin --admin-password admin123
+
+Refresh the catalog JSON from the live store:
+  python scripts/export_minipura_catalog.py --count 50
 """
 from __future__ import annotations
 
@@ -16,8 +23,8 @@ import argparse
 import math
 import os
 import sys
+import time
 import urllib.error
-import urllib.request
 from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -28,6 +35,12 @@ load_dotenv()
 
 import pymysql
 from werkzeug.security import generate_password_hash
+
+from scripts.minipura_sources import (
+    CATALOG_JSON_PATH,
+    download_image,
+    load_catalog,
+)
 
 try:
     from instance.config import (
@@ -108,6 +121,34 @@ PLACEHOLDER_JPEG = bytes(
 _IMAGE_CACHE: dict[str, tuple[bytes, str]] = {}
 
 
+def _load_seed_catalog() -> dict:
+    if not CATALOG_JSON_PATH.is_file():
+        raise FileNotFoundError(
+            f"Catalog file not found: {CATALOG_JSON_PATH}\n"
+            "Run: python scripts/export_minipura_catalog.py --count 50"
+        )
+    return load_catalog()
+
+
+def fetch_image(image_url: str, use_network: bool) -> tuple[bytes, str]:
+    """Download a product image from minipuraaqua.lk, or return a tiny placeholder."""
+    if not use_network:
+        return PLACEHOLDER_JPEG, "image/jpeg"
+    if not image_url:
+        return PLACEHOLDER_JPEG, "image/jpeg"
+    if image_url in _IMAGE_CACHE:
+        return _IMAGE_CACHE[image_url]
+    try:
+        data, mime = download_image(image_url)
+        if data:
+            _IMAGE_CACHE[image_url] = (data, mime)
+            return data, mime
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        print(f"  Warning: could not download image {image_url[:80]}: {exc}")
+    _IMAGE_CACHE[image_url] = (PLACEHOLDER_JPEG, "image/jpeg")
+    return PLACEHOLDER_JPEG, "image/jpeg"
+
+
 def get_connection():
     return pymysql.connect(
         host=MYSQL_HOST,
@@ -117,28 +158,6 @@ def get_connection():
         database=MYSQL_DATABASE,
         cursorclass=pymysql.cursors.DictCursor,
     )
-
-
-def fetch_image(seed: str, use_network: bool) -> tuple[bytes, str]:
-    if not use_network:
-        return PLACEHOLDER_JPEG, "image/jpeg"
-    if seed in _IMAGE_CACHE:
-        return _IMAGE_CACHE[seed]
-
-    url = f"https://picsum.photos/seed/{seed}/400/400"
-    try:
-        request = urllib.request.Request(url, headers={"User-Agent": "aqua-seed/1.0"})
-        with urllib.request.urlopen(request, timeout=20) as response:
-            data = response.read()
-            mime = response.headers.get_content_type() or "image/jpeg"
-            if data:
-                _IMAGE_CACHE[seed] = (data, mime)
-                return data, mime
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        print(f"  Warning: could not download image for {seed}: {exc}")
-
-    _IMAGE_CACHE[seed] = (PLACEHOLDER_JPEG, "image/jpeg")
-    return PLACEHOLDER_JPEG, "image/jpeg"
 
 
 def reset_tables(cur) -> None:
@@ -474,72 +493,81 @@ def insert_catalog_item(
     )
 
 
-def seed_plants(cur, use_images: bool) -> None:
-    print(f"Seeding {ITEM_COUNT} plants...")
-    for index in range(1, ITEM_COUNT + 1):
-        category = PLANT_CATEGORIES[(index - 1) % len(PLANT_CATEGORIES)]
-        image_data, image_type = fetch_image(f"aqua-plant-{index}", use_images)
+def seed_plants(cur, catalog: dict, use_images: bool) -> int:
+    plants = catalog.get("plants", [])[:ITEM_COUNT]
+    print(f"Seeding {len(plants)} plants from {catalog.get('source', 'minipuraaqua.lk')} ...")
+    for index, item in enumerate(plants, start=1):
+        image_data, image_type = fetch_image(item.get("image_url", ""), use_images)
         insert_catalog_item(
             cur,
             "plants",
-            name=f"Aqua Plant {index}",
-            price=round(450 + ((index - 1) % 5) * 175, 2),
-            category=category,
-            weight=WEIGHTS[(index - 1) % len(WEIGHTS)],
-            description=(
-                f"Beautiful {category.lower()} for your aquarium. "
-                "Easy to care for and thrives in most water conditions."
-            ),
-            in_stock=0 if index % 10 == 7 else 1,
+            name=item["name"],
+            price=float(item["price"]),
+            category=item["category"],
+            weight=item.get("weight") or WEIGHTS[(index - 1) % len(WEIGHTS)],
+            description=item.get("description") or "",
+            in_stock=1 if item.get("in_stock", True) else 0,
             image_data=image_data,
             image_type=image_type,
             plant_fields={
-                "care_level": CARE_LEVELS[(index - 1) % len(CARE_LEVELS)],
-                "co2_condition": CO2_OPTIONS[(index - 1) % len(CO2_OPTIONS)],
-                "light_condition": LIGHT_OPTIONS[(index - 1) % len(LIGHT_OPTIONS)],
+                "care_level": item.get("care_level") or CARE_LEVELS[(index - 1) % len(CARE_LEVELS)],
+                "co2_condition": item.get("co2_condition") or CO2_OPTIONS[(index - 1) % len(CO2_OPTIONS)],
+                "light_condition": item.get("light_condition") or LIGHT_OPTIONS[(index - 1) % len(LIGHT_OPTIONS)],
             },
         )
-    print(f"Seeded {ITEM_COUNT} plants.")
+        if use_images:
+            print(f"  [plant] {index}/{len(plants)} {item['name'][:60]} ({len(image_data)} bytes)")
+            time.sleep(0.1)
+    print(f"Seeded {len(plants)} plants.")
+    return len(plants)
 
 
-def seed_tools(cur, use_images: bool) -> None:
-    print(f"Seeding {ITEM_COUNT} tools/accessories...")
-    for index in range(1, ITEM_COUNT + 1):
-        category = TOOL_CATEGORIES[(index - 1) % len(TOOL_CATEGORIES)]
-        image_data, image_type = fetch_image(f"aqua-tool-{index}", use_images)
+def seed_tools(cur, catalog: dict, use_images: bool) -> int:
+    tools = catalog.get("tools", [])[:ITEM_COUNT]
+    print(f"Seeding {len(tools)} tools/accessories from {catalog.get('source', 'minipuraaqua.lk')} ...")
+    for index, item in enumerate(tools, start=1):
+        image_data, image_type = fetch_image(item.get("image_url", ""), use_images)
         insert_catalog_item(
             cur,
             "tools",
-            name=f"Aquarium Accessory {index}",
-            price=round(550 + ((index - 1) % 6) * 225, 2),
-            category=category,
-            weight=WEIGHTS[(index - 1) % len(WEIGHTS)],
-            description="Quality aquarium accessory for your tank. Reliable and durable.",
-            in_stock=0 if index % 10 == 3 else 1,
+            name=item["name"],
+            price=float(item["price"]),
+            category=item["category"],
+            weight=item.get("weight") or WEIGHTS[(index - 1) % len(WEIGHTS)],
+            description=item.get("description") or "",
+            in_stock=1 if item.get("in_stock", True) else 0,
             image_data=image_data,
             image_type=image_type,
         )
-    print(f"Seeded {ITEM_COUNT} tools.")
+        if use_images:
+            print(f"  [tool] {index}/{len(tools)} {item['name'][:60]} ({len(image_data)} bytes)")
+            time.sleep(0.1)
+    print(f"Seeded {len(tools)} tools.")
+    return len(tools)
 
 
-def seed_foods(cur, use_images: bool) -> None:
-    print(f"Seeding {ITEM_COUNT} foods...")
-    for index in range(1, ITEM_COUNT + 1):
-        category = FOOD_CATEGORIES[(index - 1) % len(FOOD_CATEGORIES)]
-        image_data, image_type = fetch_image(f"aqua-food-{index}", use_images)
+def seed_foods(cur, catalog: dict, use_images: bool) -> int:
+    foods = catalog.get("foods", [])[:ITEM_COUNT]
+    print(f"Seeding {len(foods)} foods from {catalog.get('source', 'minipuraaqua.lk')} ...")
+    for index, item in enumerate(foods, start=1):
+        image_data, image_type = fetch_image(item.get("image_url", ""), use_images)
         insert_catalog_item(
             cur,
             "foods",
-            name=f"Aquarium Food {index}",
-            price=round(350 + ((index - 1) % 4) * 125, 2),
-            category=category,
-            weight=WEIGHTS[(index - 1) % len(WEIGHTS)],
-            description=f"Nutritional fish food for healthy aquariums. Category: {category.lower()}.",
-            in_stock=0 if index % 10 == 5 else 1,
+            name=item["name"],
+            price=float(item["price"]),
+            category=item["category"],
+            weight=item.get("weight") or WEIGHTS[(index - 1) % len(WEIGHTS)],
+            description=item.get("description") or "",
+            in_stock=1 if item.get("in_stock", True) else 0,
             image_data=image_data,
             image_type=image_type,
         )
-    print(f"Seeded {ITEM_COUNT} foods.")
+        if use_images:
+            print(f"  [food] {index}/{len(foods)} {item['name'][:60]} ({len(image_data)} bytes)")
+            time.sleep(0.1)
+    print(f"Seeded {len(foods)} foods.")
+    return len(foods)
 
 
 def table_count(cur, table: str) -> int:
@@ -548,6 +576,9 @@ def table_count(cur, table: str) -> int:
 
 
 def main() -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser(description="Seed the Aqua database.")
     parser.add_argument("--admin-user", default="admin", help="Admin username (default: admin)")
     parser.add_argument("--admin-password", default="admin123", help="Admin password (default: admin123)")
@@ -559,9 +590,15 @@ def main() -> int:
     parser.add_argument(
         "--no-images",
         action="store_true",
-        help="Store a tiny placeholder image instead of downloading photos",
+        help="Store a tiny placeholder image instead of downloading from minipuraaqua.lk",
     )
     args = parser.parse_args()
+
+    try:
+        catalog = _load_seed_catalog()
+    except FileNotFoundError as exc:
+        print(f"ERROR: {exc}")
+        return 1
 
     try:
         conn = get_connection()
@@ -570,6 +607,7 @@ def main() -> int:
         print("Make sure XAMPP MySQL is running and scripts/init_mysql.sql was applied.")
         return 1
 
+    plant_count = tool_count = food_count = 0
     try:
         with conn.cursor() as cur:
             if args.reset:
@@ -588,9 +626,9 @@ def main() -> int:
             seed_admin(cur, args.admin_user, args.admin_password)
             seed_contact_messages(cur)
             use_images = not args.no_images
-            seed_plants(cur, use_images)
-            seed_tools(cur, use_images)
-            seed_foods(cur, use_images)
+            plant_count = seed_plants(cur, catalog, use_images)
+            tool_count = seed_tools(cur, catalog, use_images)
+            food_count = seed_foods(cur, catalog, use_images)
             seed_orders(cur)
         conn.commit()
     except Exception as exc:
@@ -601,9 +639,11 @@ def main() -> int:
         conn.close()
 
     print("Seed completed successfully.")
-    print(f"  plants:   {ITEM_COUNT}")
-    print(f"  tools:    {ITEM_COUNT}")
-    print(f"  foods:    {ITEM_COUNT}")
+    print(f"  source:   {catalog.get('source', 'minipuraaqua.lk')}")
+    print(f"  catalog:  {CATALOG_JSON_PATH}")
+    print(f"  plants:   {plant_count}")
+    print(f"  tools:    {tool_count}")
+    print(f"  foods:    {food_count}")
     print(f"  messages: 12")
     print(f"  orders:   8")
     print(f"  admin:    {args.admin_user} / {args.admin_password}")
