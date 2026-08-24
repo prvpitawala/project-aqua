@@ -59,9 +59,10 @@
                     </p>
                 </div>
                 <ul class="admin-example-list" id="deliveryExamples">
-                    <li><span>{{ base_rule.max_weight_kg|round(2) }} kg (base)</span><span id="exBase">—</span></li>
-                    <li><span>{{ (base_rule.max_weight_kg + 1)|round(2) }} kg</span><span id="exPlus1">—</span></li>
-                    <li><span>{{ (base_rule.max_weight_kg + 2.5)|round(2) }} kg</span><span id="exPlus25">—</span></li>
+                    {% set max_w = base_rule.max_weight_kg|float %}
+                    <li><span>{{ max_w|round(2) }} kg (base)</span><span id="exBase">—</span></li>
+                    <li><span>{{ (max_w + 1)|round(2) }} kg</span><span id="exPlus1">—</span></li>
+                    <li><span>{{ (max_w + 2.5)|round(2) }} kg</span><span id="exPlus25">—</span></li>
                 </ul>
             </div>
         </div>

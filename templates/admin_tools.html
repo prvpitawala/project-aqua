@@ -46,9 +46,18 @@
 .alert-success { background: #d1fae5; color: #065f46; }
 .alert-error { background: #fee2e2; color: #b91c1c; }
 .no-image { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--slate-500); font-size: 0.875rem; }
-.stock-badge { display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 6px; margin-top: 0.35rem; }
-.stock-badge-in { background: #d1fae5; color: #065f46; }
-.stock-badge-out { background: #fee2e2; color: #b91c1c; }
+.product-image-out-badge {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    background: #b91c1c;
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px 0 0 0;
+    line-height: 1.2;
+}
 .product-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0 1rem 1rem; margin-top: auto; }
 @media (max-width: 640px) { .shop-sidebar { display: none; } }
 </style>
@@ -111,11 +120,13 @@
                         {% else %}
                         <div class="no-image">No image</div>
                         {% endif %}
+                        {% if not item.in_stock %}
+                        <span class="product-image-out-badge">Out of stock</span>
+                        {% endif %}
                     </div>
                     <div class="product-info">
                         <div class="product-name">{{ item.name }}</div>
                         <span class="product-category">{{ item.category }}{% if item.weight %} · {{ item.weight }}{% endif %}</span>
-                        <span class="stock-badge stock-badge-{{ 'in' if item.in_stock else 'out' }}">{{ 'In stock' if item.in_stock else 'Out of stock' }}</span>
                     </div>
                 </a>
                 <div class="product-card-footer">

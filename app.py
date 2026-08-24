@@ -1103,6 +1103,11 @@ def admin_delivery_prices():
     base_rule = get_delivery_base_per_kg()
     if not base_rule:
         base_rule = {'max_weight_kg': 1.5, 'base_price': 450, 'extra_per_kg': 100}
+    base_rule = {
+        'max_weight_kg': float(base_rule['max_weight_kg']),
+        'base_price': float(base_rule['base_price']),
+        'extra_per_kg': float(base_rule['extra_per_kg']),
+    }
     if request.method == 'POST':
         try:
             max_kg = float(request.form.get('max_weight_kg', 1.5) or 1.5)
@@ -1115,6 +1120,11 @@ def admin_delivery_prices():
             if update_delivery_base_per_kg(max_kg, base_price, extra):
                 message = 'Delivery rule updated.'
                 base_rule = get_delivery_base_per_kg() or base_rule
+                base_rule = {
+                    'max_weight_kg': float(base_rule['max_weight_kg']),
+                    'base_price': float(base_rule['base_price']),
+                    'extra_per_kg': float(base_rule['extra_per_kg']),
+                }
             else:
                 message = 'Failed to update rule.'
                 message_type = 'error'

@@ -333,7 +333,14 @@ def get_delivery_base_per_kg():
             )
             row = cur.fetchone()
         conn.close()
-        return dict(row) if row else None
+        if not row:
+            return None
+        return {
+            'id': row['id'],
+            'max_weight_kg': float(row['max_weight_kg']),
+            'base_price': float(row['base_price']),
+            'extra_per_kg': float(row['extra_per_kg']),
+        }
     except Exception:
         return None
 
