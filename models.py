@@ -183,6 +183,11 @@ def get_tools():
     return _get_items('tools')
 
 
+def get_tool_by_id(tool_id):
+    """Fetch a single tool by id. Returns dict or None."""
+    return _get_item_by_id('tools', tool_id)
+
+
 def get_tool_image(tool_id, slot):
     """Get image blob and type for a tool. slot must be 1, 2, or 3."""
     return _get_item_image('tools', tool_id, slot)
@@ -193,9 +198,19 @@ def add_tool(name, price, category, description, image1=None, image1_type=None, 
     return _add_item('tools', name, price, category, description, image1, image1_type, image2, image2_type, image3, image3_type, weight, in_stock)
 
 
+def update_tool(tool_id, name, price, category, description, weight=None, in_stock=True):
+    """Update a tool. Returns True on success, False on error."""
+    return _update_item('tools', tool_id, name, price, category, description, weight, in_stock)
+
+
 def get_foods():
     """Fetch all foods from the database."""
     return _get_items('foods')
+
+
+def get_food_by_id(food_id):
+    """Fetch a single food by id. Returns dict or None."""
+    return _get_item_by_id('foods', food_id)
 
 
 def get_food_image(food_id, slot):
@@ -206,6 +221,11 @@ def get_food_image(food_id, slot):
 def add_food(name, price, category, description, image1=None, image1_type=None, image2=None, image2_type=None, image3=None, image3_type=None, weight=None, in_stock=True):
     """Insert a new food. Returns (new_id, None) or (None, error_message)."""
     return _add_item('foods', name, price, category, description, image1, image1_type, image2, image2_type, image3, image3_type, weight, in_stock)
+
+
+def update_food(food_id, name, price, category, description, weight=None, in_stock=True):
+    """Update a food. Returns True on success, False on error."""
+    return _update_item('foods', food_id, name, price, category, description, weight, in_stock)
 
 
 def _get_items(table):
@@ -229,6 +249,56 @@ def _get_items(table):
         return out
     except Exception:
         return []
+
+
+def _get_item_by_id(table, item_id):
+    """Fetch a single catalog item by id."""
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                f'''SELECT id, name, price, category, weight, description, in_stock,
+                   CASE WHEN image1 IS NOT NULL THEN 1 ELSE 0 END AS has_image1,
+                   CASE WHEN image2 IS NOT NULL THEN 1 ELSE 0 END AS has_image2,
+                   CASE WHEN image3 IS NOT NULL THEN 1 ELSE 0 END AS has_image3
+                   FROM {table} WHERE id = %s''',
+                (item_id,),
+            )
+            row = cur.fetchone()
+        conn.close()
+        if not row:
+            return None
+        d = dict(row)
+        if d.get('in_stock') is not None:
+            d['in_stock'] = bool(d['in_stock'])
+        return d
+    except Exception:
+        return None
+
+
+def _update_item(table, item_id, name, price, category, description, weight=None, in_stock=True):
+    """Update a tool or food row."""
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                f'''UPDATE {table} SET name=%s, price=%s, category=%s, description=%s, weight=%s, in_stock=%s
+                   WHERE id=%s''',
+                (
+                    name,
+                    price,
+                    category,
+                    description or '',
+                    (weight or '').strip() or None,
+                    1 if in_stock else 0,
+                    item_id,
+                ),
+            )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception:
+        return False
 
 
 def get_delivery_base_per_kg():

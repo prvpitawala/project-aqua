@@ -183,11 +183,9 @@
         </div>
         <div class="sidebar-section">
             <h3>Category</h3>
-            <label><input type="checkbox" checked> All Foods</label>
-            <label><input type="checkbox"> Flakes</label>
-            <label><input type="checkbox"> Pellets</label>
-            <label><input type="checkbox"> Freeze-dried</label>
-            <label><input type="checkbox"> Treats</label>
+            {% for cat in ['Flakes', 'Pellets', 'Freeze-dried', 'Treats'] %}
+            <label><input type="checkbox" name="category" value="{{ cat }}" class="filter-category" {{ 'checked' if cat in (category_filter or []) else '' }}> {{ cat }}</label>
+            {% endfor %}
         </div>
         <div class="sidebar-section">
             <h3>Price</h3>
@@ -237,14 +235,20 @@
         var checkboxes = document.querySelectorAll('.filter-stock:checked');
         return Array.prototype.map.call(checkboxes, function(cb) { return cb.value; });
     }
+    function getCategoryParams() {
+        var checkboxes = document.querySelectorAll('.filter-category:checked');
+        return Array.prototype.map.call(checkboxes, function(cb) { return cb.value; });
+    }
     function applyPublicFilters() {
         var stock = getStockParams();
+        var categories = getCategoryParams();
         var params = new URLSearchParams();
         stock.forEach(function(v) { params.append('stock', v); });
+        categories.forEach(function(v) { params.append('category', v); });
         var qs = params.toString();
         globalThis.location.search = qs ? '?' + qs : '';
     }
-    document.querySelectorAll('.filter-stock').forEach(function(cb) {
+    document.querySelectorAll('.filter-stock, .filter-category').forEach(function(cb) {
         cb.addEventListener('change', applyPublicFilters);
     });
 

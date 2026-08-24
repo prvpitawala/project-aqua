@@ -183,15 +183,9 @@
         </div>
         <div class="sidebar-section">
             <h3>Category</h3>
-            <label><input type="checkbox" checked> All Accessories</label>
-            <label><input type="checkbox"> Aquarium Soil</label>
-            <label><input type="checkbox"> water Pump</label>
-            <label><input type="checkbox"> Filter Media</label>
-            <label><input type="checkbox"> CO2 accessaries</label>
-            <label><input type="checkbox"> Fertilizers & Treatment</label>
-            <label><input type="checkbox"> Temperature accessories</label>
-            <label><input type="checkbox"> Air pumps</label>
-            <label><input type="checkbox"> Other product</label>
+            {% for cat in ['Aquarium Soil', 'water Pump', 'Filter Media', 'CO2 accessaries', 'Fertilizers & Treatment', 'Temperature accessories', 'Air pumps', 'Other product'] %}
+            <label><input type="checkbox" name="category" value="{{ cat }}" class="filter-category" {{ 'checked' if cat in (category_filter or []) else '' }}> {{ cat }}</label>
+            {% endfor %}
         </div>
         <div class="sidebar-section">
             <h3>Price</h3>
@@ -247,14 +241,20 @@
         var checkboxes = document.querySelectorAll('.filter-stock:checked');
         return Array.prototype.map.call(checkboxes, function(cb) { return cb.value; });
     }
+    function getCategoryParams() {
+        var checkboxes = document.querySelectorAll('.filter-category:checked');
+        return Array.prototype.map.call(checkboxes, function(cb) { return cb.value; });
+    }
     function applyPublicFilters() {
         var stock = getStockParams();
+        var categories = getCategoryParams();
         var params = new URLSearchParams();
         stock.forEach(function(v) { params.append('stock', v); });
+        categories.forEach(function(v) { params.append('category', v); });
         var qs = params.toString();
         globalThis.location.search = qs ? '?' + qs : '';
     }
-    document.querySelectorAll('.filter-stock').forEach(function(cb) {
+    document.querySelectorAll('.filter-stock, .filter-category').forEach(function(cb) {
         cb.addEventListener('change', applyPublicFilters);
     });
 

@@ -191,20 +191,9 @@
         </div>
         <div class="sidebar-section">
             <h3>Category</h3>
-            <label><input type="checkbox" checked> All Plants</label>
-            <label><input type="checkbox"> Anubias & Fern</label>
-            <label><input type="checkbox"> Background Plant</label>
-            <label><input type="checkbox"> Bucephalandra</label>
-            <label><input type="checkbox"> Carpeting plant</label>
-            <label><input type="checkbox"> Cryptocoryne</label>
-            <label><input type="checkbox"> Epiphyte plants</label>
-            <label><input type="checkbox"> Floating plants</label>
-            <label><input type="checkbox"> Ludwigia Varieties</label>
-            <label><input type="checkbox"> Midground Plant</label>
-            <label><input type="checkbox"> Moss</label>
-            <label><input type="checkbox"> Rare plants</label>
-            <label><input type="checkbox"> Rotala Varieties</label>
-            <label><input type="checkbox"> Other</label>
+            {% for cat in ['Anubias & Fern', 'Background Plant', 'Bucephalandra', 'Carpeting plant', 'Cryptocoryne', 'Epiphyte plants', 'Floating plants', 'Ludwigia Varieties', 'Midground Plant', 'Moss', 'Rare plants', 'Rotala Varieties', 'Other'] %}
+            <label><input type="checkbox" name="category" value="{{ cat }}" class="filter-category" {{ 'checked' if cat in (category_filter or []) else '' }}> {{ cat }}</label>
+            {% endfor %}
         </div>
         <div class="sidebar-section">
             <h3>Price</h3>
@@ -220,9 +209,9 @@
         </div>
         <div class="sidebar-section">
             <h3>Light condition</h3>
-            <label><input type="checkbox"> Low</label>
-            <label><input type="checkbox"> Medium</label>
-            <label><input type="checkbox"> High</label>
+            <label><input type="checkbox" name="light" value="High Light" class="filter-light" {{ 'checked' if 'High Light' in (light_filter or []) else '' }}> High Light</label>
+            <label><input type="checkbox" name="light" value="Medium Light" class="filter-light" {{ 'checked' if 'Medium Light' in (light_filter or []) else '' }}> Medium Light</label>
+            <label><input type="checkbox" name="light" value="Low Light" class="filter-light" {{ 'checked' if 'Low Light' in (light_filter or []) else '' }}> Low Light</label>
         </div>
     </aside>
 
@@ -270,16 +259,28 @@
         var checkboxes = document.querySelectorAll('.filter-stock:checked');
         return Array.prototype.map.call(checkboxes, function(cb) { return cb.value; });
     }
+    function getLightParams() {
+        var checkboxes = document.querySelectorAll('.filter-light:checked');
+        return Array.prototype.map.call(checkboxes, function(cb) { return cb.value; });
+    }
+    function getCategoryParams() {
+        var checkboxes = document.querySelectorAll('.filter-category:checked');
+        return Array.prototype.map.call(checkboxes, function(cb) { return cb.value; });
+    }
     function applyPublicFilters() {
         var co2 = getCo2Params();
+        var light = getLightParams();
         var stock = getStockParams();
+        var categories = getCategoryParams();
         var params = new URLSearchParams();
         co2.forEach(function(v) { params.append('co2', v); });
+        light.forEach(function(v) { params.append('light', v); });
         stock.forEach(function(v) { params.append('stock', v); });
+        categories.forEach(function(v) { params.append('category', v); });
         var qs = params.toString();
         globalThis.location.search = qs ? '?' + qs : '';
     }
-    document.querySelectorAll('.filter-co2, .filter-stock').forEach(function(cb) {
+    document.querySelectorAll('.filter-co2, .filter-light, .filter-stock, .filter-category').forEach(function(cb) {
         cb.addEventListener('change', applyPublicFilters);
     });
 
