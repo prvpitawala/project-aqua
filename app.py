@@ -1,6 +1,12 @@
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, Response
+
+from urllib.parse import urlencode
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24).hex())
@@ -9,6 +15,32 @@ app.config['MAX_CONTENT_LENGTH'] = 64 * 1024 * 1024  # 64 MB for image uploads
 MSG_NAME_CATEGORY_REQUIRED = 'Name and category are required.'
 QUERY_UPDATED = '?updated=1'
 MIME_JPEG = 'image/jpeg'
+PRODUCTS_PER_PAGE = 12
+
+
+def paginate_list(items, page, per_page=PRODUCTS_PER_PAGE):
+    """Slice a list for the requested page. Returns (page_items, total, total_pages, current_page)."""
+    total = len(items)
+    total_pages = max(1, (total + per_page - 1) // per_page) if total else 1
+    current_page = max(1, min(page or 1, total_pages))
+    start = (current_page - 1) * per_page
+    return items[start:start + per_page], total, total_pages, current_page
+
+
+@app.context_processor
+def inject_pagination_helpers():
+    def page_url(page_num):
+        params = []
+        for key in request.args:
+            if key == 'page':
+                continue
+            for val in request.args.getlist(key):
+                params.append((key, val))
+        params.append(('page', str(page_num)))
+        qs = urlencode(params)
+        return request.path + ('?' + qs if qs else '')
+
+    return dict(page_url=page_url, PRODUCTS_PER_PAGE=PRODUCTS_PER_PAGE)
 
 
 @app.route('/')
@@ -51,12 +83,20 @@ def aqua_plants():
             plants = [p for p in plants if p.get('in_stock', True)]
         elif out_ok and not in_ok:
             plants = [p for p in plants if not p.get('in_stock', True)]
-    for p in plants[:12]:
-        if 'image' not in p and p.get('has_image1'):
-            p['image'] = url_for('serve_plant_image', id=p['id'], slot=1)
-        elif 'image' not in p:
-            p['image'] = ''
-    return render_template('aqua_plants.html', plants=plants[:12], co2_filter=co2, stock_filter=stock)
+    page = request.args.get('page', 1, type=int)
+    page_plants, total, total_pages, page = paginate_list(plants, page)
+    _ensure_plant_images(page_plants)
+    return render_template(
+        'aqua_plants.html',
+        plants=page_plants,
+        co2_filter=co2,
+        stock_filter=stock,
+        page=page,
+        total=total,
+        total_pages=total_pages,
+        per_page=PRODUCTS_PER_PAGE,
+        item_label='plant',
+    )
 
 
 def get_plant(id):
@@ -125,7 +165,18 @@ def accessories():
             items = [a for a in items if a.get('in_stock', True)]
         elif out_ok and not in_ok:
             items = [a for a in items if not a.get('in_stock', True)]
-    return render_template('accessories.html', accessories=items[:12], stock_filter=stock)
+    page = request.args.get('page', 1, type=int)
+    page_items, total, total_pages, page = paginate_list(items, page)
+    return render_template(
+        'accessories.html',
+        accessories=page_items,
+        stock_filter=stock,
+        page=page,
+        total=total,
+        total_pages=total_pages,
+        per_page=PRODUCTS_PER_PAGE,
+        item_label='accessory',
+    )
 
 
 def get_accessory(id):
@@ -179,7 +230,18 @@ def foods():
             items = [f for f in items if f.get('in_stock', True)]
         elif out_ok and not in_ok:
             items = [f for f in items if not f.get('in_stock', True)]
-    return render_template('foods.html', foods=items[:12], stock_filter=stock)
+    page = request.args.get('page', 1, type=int)
+    page_items, total, total_pages, page = paginate_list(items, page)
+    return render_template(
+        'foods.html',
+        foods=page_items,
+        stock_filter=stock,
+        page=page,
+        total=total,
+        total_pages=total_pages,
+        per_page=PRODUCTS_PER_PAGE,
+        item_label='food',
+    )
 
 
 def get_food(id):
@@ -358,8 +420,23 @@ def admin_plants():
     stock = request.args.getlist('stock')
     plants = get_plants() or SAMPLE_PLANTS
     plants = _filter_plants_for_admin(plants, co2, light, stock)
-    _ensure_plant_images(plants)
-    return render_template('admin_plants.html', plants=plants, message=message, message_type=message_type, co2_filter=co2, light_filter=light, stock_filter=stock)
+    page = request.args.get('page', 1, type=int)
+    page_plants, total, total_pages, page = paginate_list(plants, page)
+    _ensure_plant_images(page_plants)
+    return render_template(
+        'admin_plants.html',
+        plants=page_plants,
+        message=message,
+        message_type=message_type,
+        co2_filter=co2,
+        light_filter=light,
+        stock_filter=stock,
+        page=page,
+        total=total,
+        total_pages=total_pages,
+        per_page=PRODUCTS_PER_PAGE,
+        item_label='plant',
+    )
 
 
 @app.route('/admin/plants/<int:id>')
@@ -520,14 +597,21 @@ def admin_tools():
         message, message_type = _process_admin_add_form(add_tool, 'Tool')
     stock = request.args.getlist('stock')
     items = SAMPLE_ACCESSORIES
-    if stock:
-        in_ok = 'in' in stock
-        out_ok = 'out' in stock
-        if in_ok and not out_ok:
-            items = [a for a in items if a.get('in_stock', True)]
-        elif out_ok and not in_ok:
-            items = [a for a in items if not a.get('in_stock', True)]
-    return render_template('admin_tools.html', items=items, message=message, message_type=message_type, stock_filter=stock)
+    items = _filter_items_by_stock(items, stock)
+    page = request.args.get('page', 1, type=int)
+    page_items, total, total_pages, page = paginate_list(items, page)
+    return render_template(
+        'admin_tools.html',
+        items=page_items,
+        message=message,
+        message_type=message_type,
+        stock_filter=stock,
+        page=page,
+        total=total,
+        total_pages=total_pages,
+        per_page=PRODUCTS_PER_PAGE,
+        item_label='tool',
+    )
 
 
 @app.route('/admin/tools/<int:id>/edit', methods=['GET', 'POST'])
@@ -567,14 +651,21 @@ def admin_foods():
         message, message_type = _process_admin_add_form(add_food, 'Food')
     stock = request.args.getlist('stock')
     items = SAMPLE_FOODS
-    if stock:
-        in_ok = 'in' in stock
-        out_ok = 'out' in stock
-        if in_ok and not out_ok:
-            items = [f for f in items if f.get('in_stock', True)]
-        elif out_ok and not in_ok:
-            items = [f for f in items if not f.get('in_stock', True)]
-    return render_template('admin_foods.html', items=items, message=message, message_type=message_type, stock_filter=stock)
+    items = _filter_items_by_stock(items, stock)
+    page = request.args.get('page', 1, type=int)
+    page_items, total, total_pages, page = paginate_list(items, page)
+    return render_template(
+        'admin_foods.html',
+        items=page_items,
+        message=message,
+        message_type=message_type,
+        stock_filter=stock,
+        page=page,
+        total=total,
+        total_pages=total_pages,
+        per_page=PRODUCTS_PER_PAGE,
+        item_label='food',
+    )
 
 
 @app.route('/admin/foods/<int:id>/edit', methods=['GET', 'POST'])

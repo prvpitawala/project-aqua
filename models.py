@@ -1,5 +1,10 @@
 """Database models and auth logic for Aqua."""
 import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import pymysql
 from werkzeug.security import check_password_hash
 

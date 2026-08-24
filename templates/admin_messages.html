@@ -5,7 +5,7 @@
 {% block content %}
 <div class="page-header admin-header">
     <div>
-        <a href="{{ url_for('admin_dashboard') }}" class="back-link">← Dashboard</a>
+        <a href="{{ url_for('admin_dashboard') }}" class="back-link">Dashboard</a>
         <h1>Contact Messages</h1>
         <p>Messages sent from the contact form{% if total %} ({{ total }} total){% endif %}</p>
     </div>
@@ -50,9 +50,9 @@
         <div class="pagination-info">Page {{ page }} of {{ total_pages }} ({{ total }} message{{ 's' if total != 1 else '' }} total, {{ per_page }} per page)</div>
         <div class="pagination-links">
             {% if page > 1 %}
-            <a href="{{ url_for('admin_messages', page=page - 1) }}" class="pagination-btn">← Previous</a>
+            <a href="{{ url_for('admin_messages', page=page - 1) }}" class="pagination-btn">Previous</a>
             {% else %}
-            <span class="pagination-btn disabled">← Previous</span>
+            <span class="pagination-btn disabled">Previous</span>
             {% endif %}
             {% if total_pages > 1 %}
             {% set start = [1, page - 2]|max %}
@@ -74,9 +74,9 @@
             {% endif %}
             {% endif %}
             {% if page < total_pages %}
-            <a href="{{ url_for('admin_messages', page=page + 1) }}" class="pagination-btn">Next →</a>
+            <a href="{{ url_for('admin_messages', page=page + 1) }}" class="pagination-btn">Next</a>
             {% else %}
-            <span class="pagination-btn disabled">Next →</span>
+            <span class="pagination-btn disabled">Next</span>
             {% endif %}
         </div>
     </nav>

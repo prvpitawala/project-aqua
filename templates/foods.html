@@ -165,22 +165,6 @@
     clip: rect(0,0,0,0);
     border: 0;
 }
-.load-more {
-    text-align: center;
-    padding: 2rem;
-}
-.load-more .spinner {
-    display: none;
-    width: 32px;
-    height: 32px;
-    border: 3px solid #e2e8f0;
-    border-top-color: var(--aqua-500);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin: 0 auto 1rem;
-}
-.load-more.loading .spinner { display: inline-block; }
-@keyframes spin { to { transform: rotate(360deg); } }
 </style>
 {% endblock %}
 
@@ -242,30 +226,20 @@
             </div>
             {% endfor %}
         </div>
-        <div id="loadMore" class="load-more">
-            <div class="spinner"></div>
-            <span id="loadStatus"></span>
-        </div>
+        {% include 'partials/pagination.html' %}
     </div>
 </div>
 
 <script>
 (function() {
     var grid = document.getElementById('productsGrid');
-    var loadMore = document.getElementById('loadMore');
-    var loadStatus = document.getElementById('loadStatus');
-    var page = 1;
-    var loading = false;
-    var hasMore = true;
-
     function getStockParams() {
         var checkboxes = document.querySelectorAll('.filter-stock:checked');
         return Array.prototype.map.call(checkboxes, function(cb) { return cb.value; });
     }
     function applyPublicFilters() {
         var stock = getStockParams();
-        var params = new URLSearchParams(globalThis.location.search);
-        params.delete('stock');
+        var params = new URLSearchParams();
         stock.forEach(function(v) { params.append('stock', v); });
         var qs = params.toString();
         globalThis.location.search = qs ? '?' + qs : '';
@@ -273,24 +247,6 @@
     document.querySelectorAll('.filter-stock').forEach(function(cb) {
         cb.addEventListener('change', applyPublicFilters);
     });
-
-    function buildApiUrl(pageNum) {
-        var params = new URLSearchParams();
-        params.set('page', String(pageNum));
-        getStockParams().forEach(function(v) { params.append('stock', v); });
-        return '/api/foods?' + params.toString();
-    }
-
-    function createCard(item) {
-        var card = document.createElement('div');
-        card.className = 'product-card';
-        card.dataset.id = item.id;
-        var inStock = item.in_stock !== false;
-        var imageBadge = inStock ? '' : '<span class="product-image-out-badge">Out of stock</span>';
-        var btnHtml = inStock ? '<button type="button" class="cart-icon-btn btn-add-cart" data-name="' + item.name + '" data-price="' + item.price + '" data-image="' + (item.image || '') + '" data-weight="' + (item.weight || 0) + '" title="Add to cart"><span class="cart-label">Add to cart</span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 2a1 1 0 0 0-.9.6L2.2 9.4A1 1 0 0 0 3 11h1.4l1.8 9.2a1 1 0 0 0 1 .8h9.6a1 1 0 0 0 1-.8L18.6 11H21a1 1 0 0 0 .8-1.6L18.9 2.6A1 1 0 0 0 18 2H6zm3.2 9h5.6l-1.2 6H10.4L9.2 11z"/></svg></button>' : '<span class="cart-icon-btn btn-add-cart btn-add-cart-disabled" title="Out of stock" aria-disabled="true">Out of stock</span>';
-        card.innerHTML = '<a href="/foods/' + item.id + '" class="product-card-link"><div class="product-image"><img src="' + item.image + '" alt="' + item.name + '" loading="lazy">' + imageBadge + '</div><div class="product-info"><div class="product-name">' + item.name + '</div><div class="product-info-row"><span class="product-price">LKR ' + item.price.toFixed(2) + '</span>' + btnHtml + '</div></div></a>';
-        return card;
-    }
 
     grid.addEventListener('click', function(e) {
         var btn = e.target.closest('.btn-add-cart');
@@ -300,34 +256,6 @@
             AquaCart.add(btn.dataset.name, Number.parseFloat(btn.dataset.price), btn.dataset.image || '', btn.dataset.weight);
         }
     });
-
-    function loadMoreItems() {
-        if (loading || !hasMore) return;
-        loading = true;
-        loadMore.classList.add('loading');
-        page++;
-        fetch(buildApiUrl(page))
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                data.foods.forEach(function(item) {
-                    grid.appendChild(createCard(item));
-                });
-                hasMore = data.has_more;
-                loadStatus.textContent = hasMore ? '' : 'No more foods';
-                loading = false;
-                loadMore.classList.remove('loading');
-            })
-            .catch(function() {
-                loading = false;
-                loadMore.classList.remove('loading');
-                loadStatus.textContent = 'Error loading';
-            });
-    }
-
-    var observer = new IntersectionObserver(function(entries) {
-        if (entries[0].isIntersecting && hasMore) loadMoreItems();
-    }, { threshold: 0.1, rootMargin: '100px' });
-    observer.observe(loadMore);
 })();
 </script>
 {% endblock %}

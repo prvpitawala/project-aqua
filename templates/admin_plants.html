@@ -90,7 +90,7 @@
 {% block content %}
 <div class="page-header admin-header">
     <div>
-        <a href="{{ url_for('admin_dashboard') }}" class="back-link">← Dashboard</a>
+        <a href="{{ url_for('admin_dashboard') }}" class="back-link">Dashboard</a>
         <h1>Manage Plants</h1>
         <p>Browse and add aquatic plants</p>
     </div>
@@ -146,10 +146,12 @@
 
     <div class="products-section">
         <div class="products-grid">
+            {% if page == 1 %}
             <button type="button" class="product-card add-new-card" onclick="openAddModal()">
                 <span class="add-icon">+</span>
                 <span class="add-text">Add New Plant</span>
             </button>
+            {% endif %}
             {% for plant in plants %}
             <div class="product-card">
                 <a href="{{ url_for('admin_plant_detail', id=plant.id) }}" class="product-card-link">
@@ -175,13 +177,14 @@
             </div>
             {% endfor %}
         </div>
+        {% include 'partials/pagination.html' %}
     </div>
 </div>
 
-<button type="button" id="addModal" class="add-modal-overlay" onclick="if(event.target===this)closeAddModal()" onkeydown="if(event.key==='Escape')closeAddModal()">
+<div id="addModal" class="add-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="addModalTitle" onclick="if(event.target===this)closeAddModal()">
     <div class="add-modal">
         <div class="add-modal-header">
-            <h2>Add New Plant</h2>
+            <h2 id="addModalTitle">Add New Plant</h2>
             <button type="button" class="add-modal-close" onclick="closeAddModal()" aria-label="Close">×</button>
         </div>
         <form method="post" action="{{ url_for('admin_plants') }}" enctype="multipart/form-data" class="add-modal-body">
@@ -302,12 +305,12 @@
             <button type="submit" class="btn-submit">Add Plant</button>
         </form>
     </div>
-</button>
+</div>
 
-<button type="button" id="editModal" class="add-modal-overlay" onclick="if(event.target===this)closeEditModal()" onkeydown="if(event.key==='Escape')closeEditModal()">
+<div id="editModal" class="add-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="editModalTitle" onclick="if(event.target===this)closeEditModal()">
     <div class="add-modal">
         <div class="add-modal-header">
-            <h2>Edit Plant</h2>
+            <h2 id="editModalTitle">Edit Plant</h2>
             <button type="button" class="add-modal-close" onclick="closeEditModal()" aria-label="Close">×</button>
         </div>
         <form id="editPlantForm" method="post" enctype="multipart/form-data" class="add-modal-body">
@@ -413,7 +416,7 @@
             <button type="submit" class="btn-submit">Save Changes</button>
         </form>
     </div>
-</button>
+</div>
 
 <script>
 function openAddModal() { document.getElementById('addModal').classList.add('show'); }
@@ -426,6 +429,7 @@ function applyAdminFilters() {
     params.delete('co2');
     params.delete('light');
     params.delete('stock');
+    params.delete('page');
     co2.forEach(function(v) { params.append('co2', v); });
     light.forEach(function(v) { params.append('light', v); });
     stock.forEach(function(v) { params.append('stock', v); });

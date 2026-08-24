@@ -1,0 +1,39 @@
+{% if total is defined and total > 0 %}
+<nav class="pagination" aria-label="Pagination">
+    <div class="pagination-info">
+        Page {{ page }} of {{ total_pages }}
+        ({{ total }} {{ item_label }}{{ 's' if total != 1 else '' }} total{% if per_page %}, {{ per_page }} per page{% endif %})
+    </div>
+    <div class="pagination-links">
+        {% if page > 1 %}
+        <a href="{{ page_url(page - 1) }}" class="pagination-btn">Previous</a>
+        {% else %}
+        <span class="pagination-btn disabled">Previous</span>
+        {% endif %}
+        {% if total_pages > 1 %}
+        {% set start = [1, page - 2]|max %}
+        {% set end = [total_pages, page + 2]|min %}
+        {% if start > 1 %}
+        <a href="{{ page_url(1) }}" class="pagination-btn">1</a>
+        {% if start > 2 %}<span class="pagination-ellipsis">…</span>{% endif %}
+        {% endif %}
+        {% for p in range(start, end + 1) %}
+        {% if p == page %}
+        <span class="pagination-btn active">{{ p }}</span>
+        {% else %}
+        <a href="{{ page_url(p) }}" class="pagination-btn">{{ p }}</a>
+        {% endif %}
+        {% endfor %}
+        {% if end < total_pages %}
+        {% if end < total_pages - 1 %}<span class="pagination-ellipsis">…</span>{% endif %}
+        <a href="{{ page_url(total_pages) }}" class="pagination-btn">{{ total_pages }}</a>
+        {% endif %}
+        {% endif %}
+        {% if page < total_pages %}
+        <a href="{{ page_url(page + 1) }}" class="pagination-btn">Next</a>
+        {% else %}
+        <span class="pagination-btn disabled">Next</span>
+        {% endif %}
+    </div>
+</nav>
+{% endif %}
