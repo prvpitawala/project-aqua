@@ -15,10 +15,11 @@ app.config['MAX_CONTENT_LENGTH'] = 64 * 1024 * 1024  # 64 MB for image uploads
 MSG_NAME_CATEGORY_REQUIRED = 'Name and category are required.'
 QUERY_UPDATED = '?updated=1'
 MIME_JPEG = 'image/jpeg'
-PRODUCTS_PER_PAGE = 12
+CATALOG_PER_PAGE_DEFAULT = 20
+CATALOG_PER_PAGE_OPTIONS = (10, 20, 50)
 
 
-def paginate_list(items, page, per_page=PRODUCTS_PER_PAGE):
+def paginate_list(items, page, per_page=CATALOG_PER_PAGE_DEFAULT):
     """Slice a list for the requested page. Returns (page_items, total, total_pages, current_page)."""
     total = len(items)
     total_pages = max(1, (total + per_page - 1) // per_page) if total else 1
@@ -27,25 +28,53 @@ def paginate_list(items, page, per_page=PRODUCTS_PER_PAGE):
     return items[start:start + per_page], total, total_pages, current_page
 
 
+def _resolve_catalog_per_page():
+    """Resolve items-per-page from query or session. Resets to page 1 when per_page changes."""
+    per_page_arg = request.args.get('per_page', type=int)
+    page = request.args.get('page', 1, type=int)
+    if per_page_arg is not None and per_page_arg in CATALOG_PER_PAGE_OPTIONS:
+        session['catalog_per_page'] = per_page_arg
+        return per_page_arg, 1
+    per_page = session.get('catalog_per_page', CATALOG_PER_PAGE_DEFAULT)
+    if per_page not in CATALOG_PER_PAGE_OPTIONS:
+        per_page = CATALOG_PER_PAGE_DEFAULT
+    return per_page, page
+
+
 @app.context_processor
 def inject_pagination_helpers():
     def page_url(page_num):
         params = []
+        has_per_page = False
         for key in request.args:
             if key == 'page':
                 continue
+            if key == 'per_page':
+                has_per_page = True
             for val in request.args.getlist(key):
                 params.append((key, val))
+        if not has_per_page:
+            per_page = session.get('catalog_per_page', CATALOG_PER_PAGE_DEFAULT)
+            if per_page in CATALOG_PER_PAGE_OPTIONS:
+                params.append(('per_page', str(per_page)))
         params.append(('page', str(page_num)))
         qs = urlencode(params)
         return request.path + ('?' + qs if qs else '')
 
-    return dict(page_url=page_url, PRODUCTS_PER_PAGE=PRODUCTS_PER_PAGE)
+    return dict(
+        page_url=page_url,
+        per_page_options=CATALOG_PER_PAGE_OPTIONS,
+        catalog_per_page_default=CATALOG_PER_PAGE_DEFAULT,
+    )
 
 
 @app.route('/')
 def index():
-    return render_template('public.html', top_products=get_top_selling())
+    return render_template(
+        'public.html',
+        top_products=get_top_selling(),
+        category_images=get_category_preview_images(),
+    )
 
 
 @app.route('/public')
@@ -97,8 +126,8 @@ def aqua_plants():
     stock = request.args.getlist('stock')
     categories = request.args.getlist('category')
     plants = _filter_plants(get_plants(), co2, light, stock, categories)
-    page = request.args.get('page', 1, type=int)
-    page_plants, total, total_pages, page = paginate_list(plants, page)
+    per_page, page = _resolve_catalog_per_page()
+    page_plants, total, total_pages, page = paginate_list(plants, page, per_page)
     _attach_catalog_images(page_plants, 'serve_plant_image')
     return render_template(
         'aqua_plants.html',
@@ -110,7 +139,7 @@ def aqua_plants():
         page=page,
         total=total,
         total_pages=total_pages,
-        per_page=PRODUCTS_PER_PAGE,
+        per_page=per_page,
         item_label='plant',
     )
 
@@ -149,8 +178,8 @@ def accessories():
     categories = request.args.getlist('category')
     items = _filter_by_category(get_tools(), categories)
     items = _filter_items_by_stock(items, stock)
-    page = request.args.get('page', 1, type=int)
-    page_items, total, total_pages, page = paginate_list(items, page)
+    per_page, page = _resolve_catalog_per_page()
+    page_items, total, total_pages, page = paginate_list(items, page, per_page)
     _attach_catalog_images(page_items, 'serve_tool_image')
     return render_template(
         'accessories.html',
@@ -160,7 +189,7 @@ def accessories():
         page=page,
         total=total,
         total_pages=total_pages,
-        per_page=PRODUCTS_PER_PAGE,
+        per_page=per_page,
         item_label='accessory',
     )
 
@@ -198,8 +227,8 @@ def foods():
     categories = request.args.getlist('category')
     items = _filter_by_category(get_foods(), categories)
     items = _filter_items_by_stock(items, stock)
-    page = request.args.get('page', 1, type=int)
-    page_items, total, total_pages, page = paginate_list(items, page)
+    per_page, page = _resolve_catalog_per_page()
+    page_items, total, total_pages, page = paginate_list(items, page, per_page)
     _attach_catalog_images(page_items, 'serve_food_image')
     return render_template(
         'foods.html',
@@ -209,7 +238,7 @@ def foods():
         page=page,
         total=total,
         total_pages=total_pages,
-        per_page=PRODUCTS_PER_PAGE,
+        per_page=per_page,
         item_label='food',
     )
 
@@ -270,6 +299,25 @@ def get_top_selling():
     return items
 
 
+def _first_item_image_url(items, endpoint):
+    """Return image URL for the first catalog item that has an image."""
+    for item in items:
+        if item.get('has_image1'):
+            return url_for(endpoint, id=item['id'], slot=1)
+    return None
+
+
+def get_category_preview_images():
+    """Sample image per home-page category card (plants, tools, foods)."""
+    from models import get_foods, get_plants, get_tools
+
+    return {
+        'plants': _first_item_image_url(get_plants(), 'serve_plant_image'),
+        'tools': _first_item_image_url(get_tools(), 'serve_tool_image'),
+        'foods': _first_item_image_url(get_foods(), 'serve_food_image'),
+    }
+
+
 @app.route('/tools')
 def tools():
     return render_template('tools.html')
@@ -288,6 +336,43 @@ def contact():
             new_id, _ = save_contact_message(name, email, subject, message)
             success = new_id is not None
     return render_template('contact.html', success=success)
+
+
+@app.route('/checkout')
+def checkout():
+    return render_template('checkout.html')
+
+
+@app.route('/api/orders', methods=['POST'])
+def api_create_order():
+    from models import create_order
+
+    data = request.get_json(silent=True) or {}
+    customer_name = (data.get('customer_name') or '').strip()
+    customer_email = (data.get('customer_email') or '').strip()
+    customer_phone = (data.get('customer_phone') or '').strip()
+    delivery_address = (data.get('delivery_address') or '').strip()
+    notes = (data.get('notes') or '').strip()
+    items = data.get('items') or []
+
+    if not customer_name or not customer_email:
+        return jsonify(success=False, error='Name and email are required.'), 400
+    if not delivery_address:
+        return jsonify(success=False, error='Delivery address is required.'), 400
+    if not items:
+        return jsonify(success=False, error='Your cart is empty.'), 400
+
+    order_id, error = create_order(
+        customer_name,
+        customer_email,
+        customer_phone,
+        delivery_address,
+        notes,
+        items,
+    )
+    if not order_id:
+        return jsonify(success=False, error=error or 'Could not place order.'), 400
+    return jsonify(success=True, order_id=order_id)
 
 
 @app.route('/signin')
@@ -343,7 +428,100 @@ def admin_messages():
         if per_page not in PER_PAGE_OPTIONS:
             per_page = 15
     messages, total, total_pages, current_page = get_contact_messages_paginated(page, per_page)
-    return render_template('admin_messages.html', messages=messages, total=total, total_pages=total_pages, page=current_page, per_page=per_page, per_page_options=PER_PAGE_OPTIONS)
+    notice = None
+    notice_type = None
+    if request.args.get('reply_saved') == '1':
+        notice = 'Reply saved. Email delivery will be enabled in a future update.'
+        notice_type = 'success'
+    elif request.args.get('error'):
+        notice = request.args.get('error')
+        notice_type = 'error'
+    return render_template(
+        'admin_messages.html',
+        messages=messages,
+        total=total,
+        total_pages=total_pages,
+        page=current_page,
+        per_page=per_page,
+        per_page_options=PER_PAGE_OPTIONS,
+        notice=notice,
+        notice_type=notice_type,
+    )
+
+
+@app.route('/admin/messages/<int:message_id>/reply', methods=['POST'])
+@admin_required
+def admin_message_reply(message_id):
+    from models import get_contact_message_by_id
+
+    message = get_contact_message_by_id(message_id)
+    if not message:
+        return redirect(url_for('admin_messages', error='Message not found.'))
+
+    reply_subject = request.form.get('reply_subject', '').strip()
+    reply_body = request.form.get('reply_body', '').strip()
+    if not reply_subject or not reply_body:
+        return redirect(url_for('admin_messages', error='Reply subject and message are required.'))
+
+    # TODO: send email to message['email'] with reply_subject and reply_body
+    _ = (message, reply_subject, reply_body)
+
+    return redirect(url_for('admin_messages', reply_saved=1))
+
+
+@app.route('/admin/orders')
+@admin_required
+def admin_orders():
+    from models import get_orders_paginated
+    page = request.args.get('page', 1, type=int)
+    per_page_arg = request.args.get('per_page', type=int)
+    if per_page_arg is not None and per_page_arg in PER_PAGE_OPTIONS:
+        session['orders_per_page'] = per_page_arg
+        per_page = per_page_arg
+        page = 1
+    else:
+        per_page = session.get('orders_per_page', 15)
+        if per_page not in PER_PAGE_OPTIONS:
+            per_page = 15
+    orders, total, total_pages, current_page = get_orders_paginated(page, per_page)
+    return render_template(
+        'admin_orders.html',
+        orders=orders,
+        total=total,
+        total_pages=total_pages,
+        page=current_page,
+        per_page=per_page,
+        per_page_options=PER_PAGE_OPTIONS,
+    )
+
+
+@app.route('/admin/orders/<int:order_id>', methods=['GET', 'POST'])
+@admin_required
+def admin_order_detail(order_id):
+    from models import get_order_by_id, update_order_status
+
+    order = get_order_by_id(order_id)
+    if not order:
+        return redirect(url_for('admin_orders'))
+
+    message = None
+    message_type = None
+    if request.method == 'POST':
+        status = request.form.get('status', '').strip()
+        if update_order_status(order_id, status):
+            message = 'Order status updated.'
+            message_type = 'success'
+            order = get_order_by_id(order_id)
+        else:
+            message = 'Could not update order status.'
+            message_type = 'error'
+
+    return render_template(
+        'admin_order_detail.html',
+        order=order,
+        message=message,
+        message_type=message_type,
+    )
 
 
 def _filter_items_by_stock(items, stock):
@@ -430,8 +608,8 @@ def admin_plants():
     stock = request.args.getlist('stock')
     categories = request.args.getlist('category')
     plants = _filter_plants_for_admin(get_plants(), co2, light, stock, categories)
-    page = request.args.get('page', 1, type=int)
-    page_plants, total, total_pages, page = paginate_list(plants, page)
+    per_page, page = _resolve_catalog_per_page()
+    page_plants, total, total_pages, page = paginate_list(plants, page, per_page)
     _ensure_plant_images(page_plants)
     return render_template(
         'admin_plants.html',
@@ -444,7 +622,7 @@ def admin_plants():
         page=page,
         total=total,
         total_pages=total_pages,
-        per_page=PRODUCTS_PER_PAGE,
+        per_page=per_page,
         item_label='plant',
     )
 
@@ -614,8 +792,8 @@ def admin_tools():
     categories = request.args.getlist('category')
     items = _filter_by_category(get_tools(), categories)
     items = _filter_items_by_stock(items, stock)
-    page = request.args.get('page', 1, type=int)
-    page_items, total, total_pages, page = paginate_list(items, page)
+    per_page, page = _resolve_catalog_per_page()
+    page_items, total, total_pages, page = paginate_list(items, page, per_page)
     _attach_catalog_images(page_items, 'serve_tool_image')
     return render_template(
         'admin_tools.html',
@@ -627,7 +805,7 @@ def admin_tools():
         page=page,
         total=total,
         total_pages=total_pages,
-        per_page=PRODUCTS_PER_PAGE,
+        per_page=per_page,
         item_label='tool',
     )
 
@@ -708,8 +886,8 @@ def admin_foods():
     categories = request.args.getlist('category')
     items = _filter_by_category(get_foods(), categories)
     items = _filter_items_by_stock(items, stock)
-    page = request.args.get('page', 1, type=int)
-    page_items, total, total_pages, page = paginate_list(items, page)
+    per_page, page = _resolve_catalog_per_page()
+    page_items, total, total_pages, page = paginate_list(items, page, per_page)
     _attach_catalog_images(page_items, 'serve_food_image')
     return render_template(
         'admin_foods.html',
@@ -721,7 +899,7 @@ def admin_foods():
         page=page,
         total=total,
         total_pages=total_pages,
-        per_page=PRODUCTS_PER_PAGE,
+        per_page=per_page,
         item_label='food',
     )
 

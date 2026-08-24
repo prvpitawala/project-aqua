@@ -87,6 +87,33 @@ CREATE TABLE IF NOT EXISTS contact_messages (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Customer orders (from cart checkout)
+CREATE TABLE IF NOT EXISTS orders (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_name VARCHAR(200) NOT NULL,
+    customer_email VARCHAR(255) NOT NULL,
+    customer_phone VARCHAR(50) DEFAULT NULL,
+    delivery_address TEXT DEFAULT NULL,
+    notes TEXT DEFAULT NULL,
+    subtotal DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    delivery_fee DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    total DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    status VARCHAR(40) NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS order_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    product_type VARCHAR(20) NOT NULL,
+    product_id INT NOT NULL,
+    product_name VARCHAR(200) NOT NULL,
+    unit_price DECIMAL(10, 2) NOT NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    line_total DECIMAL(10, 2) NOT NULL,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+);
+
 -- High-quality images: LONGBLOB supports up to 4 GB per image.
 -- If uploading very large images, increase MySQL max_allowed_packet:
 --   SET GLOBAL max_allowed_packet = 67108864;  -- 64 MB

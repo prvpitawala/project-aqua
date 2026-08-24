@@ -9,20 +9,53 @@
 </div>
 
 <div class="explore-cards">
-    <a href="{{ url_for('aqua_plants') }}" class="explore-card" style="text-decoration: none; color: inherit;">
-        <h2 class="explore-card-title">Plants</h2>
-        <p class="explore-card-desc">Browse our collection of aquatic plants</p>
-        <span class="explore-card-btn">Click here</span>
+    <a href="{{ url_for('aqua_plants') }}" class="explore-card">
+        <div class="explore-card-image">
+            {% if category_images.plants %}
+            <img src="{{ category_images.plants }}" alt="Aquatic plants" loading="lazy">
+            {% else %}
+            <div class="explore-card-placeholder explore-card-placeholder--plants" aria-hidden="true">
+                <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><path d="M32 56V28"/><path d="M32 36c-8-10-18-12-18-22 0 10 8 16 18 14"/><path d="M32 40c8-10 18-12 18-22 0 10-8 16-18 14"/><ellipse cx="32" cy="56" rx="14" ry="3"/></svg>
+            </div>
+            {% endif %}
+        </div>
+        <div class="explore-card-body">
+            <h2 class="explore-card-title">Plants</h2>
+            <p class="explore-card-desc">Browse our collection of aquatic plants</p>
+            <span class="explore-card-btn">Browse plants</span>
+        </div>
     </a>
-    <a href="{{ url_for('accessories') }}" class="explore-card" style="text-decoration: none; color: inherit;">
-        <h2 class="explore-card-title">Tools</h2>
-        <p class="explore-card-desc">Find accessories and tools for your aquarium</p>
-        <span class="explore-card-btn">Click here</span>
+    <a href="{{ url_for('accessories') }}" class="explore-card">
+        <div class="explore-card-image">
+            {% if category_images.tools %}
+            <img src="{{ category_images.tools }}" alt="Aquarium tools and accessories" loading="lazy">
+            {% else %}
+            <div class="explore-card-placeholder explore-card-placeholder--tools" aria-hidden="true">
+                <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><rect x="14" y="22" width="36" height="24" rx="4"/><path d="M22 22V18a10 10 0 0 1 20 0v4"/><circle cx="32" cy="34" r="4"/></svg>
+            </div>
+            {% endif %}
+        </div>
+        <div class="explore-card-body">
+            <h2 class="explore-card-title">Tools</h2>
+            <p class="explore-card-desc">Find accessories and tools for your aquarium</p>
+            <span class="explore-card-btn">Browse tools</span>
+        </div>
     </a>
-    <a href="{{ url_for('foods') }}" class="explore-card" style="text-decoration: none; color: inherit;">
-        <h2 class="explore-card-title">Foods</h2>
-        <p class="explore-card-desc">Fish food and feeding supplies</p>
-        <span class="explore-card-btn">Click here</span>
+    <a href="{{ url_for('foods') }}" class="explore-card">
+        <div class="explore-card-image">
+            {% if category_images.foods %}
+            <img src="{{ category_images.foods }}" alt="Fish food products" loading="lazy">
+            {% else %}
+            <div class="explore-card-placeholder explore-card-placeholder--foods" aria-hidden="true">
+                <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="32" cy="32" rx="20" ry="12"/><path d="M12 32c-4-2-6-6-6-6s4 2 8 4"/><circle cx="40" cy="28" r="2" fill="currentColor" stroke="none"/></svg>
+            </div>
+            {% endif %}
+        </div>
+        <div class="explore-card-body">
+            <h2 class="explore-card-title">Foods</h2>
+            <p class="explore-card-desc">Fish food and feeding supplies</p>
+            <span class="explore-card-btn">Browse foods</span>
+        </div>
     </a>
 </div>
 
@@ -54,56 +87,94 @@
 
 <style>
 .explore-cards {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 2rem;
-    min-height: 50vh;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0.5rem 0 1rem;
 }
 .explore-card {
-    display: block;
+    display: flex;
+    flex-direction: column;
     cursor: pointer;
     background: #fff;
-    border-radius: 24px;
-    padding: 4rem 3.5rem;
-    min-width: 360px;
-    max-width: 420px;
+    border-radius: 20px;
+    padding: 0;
+    overflow: hidden;
     border: 1px solid #e2e8f0;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     text-decoration: none;
-    transition: all 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     color: inherit;
 }
 .explore-card:hover {
     border-color: var(--aqua-500);
-    box-shadow: 0 12px 32px rgba(6, 182, 212, 0.2);
+    box-shadow: 0 12px 32px rgba(6, 182, 212, 0.18);
+    transform: translateY(-4px);
 }
-.explore-card-icon {
-    font-size: 5.5rem;
-    margin-bottom: 2rem;
+.explore-card-image {
+    aspect-ratio: 4 / 3;
+    background: linear-gradient(145deg, #e0f2fe 0%, #f0fdfa 100%);
+    overflow: hidden;
+    position: relative;
+}
+.explore-card-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.35s ease;
+}
+.explore-card:hover .explore-card-image img {
+    transform: scale(1.04);
+}
+.explore-card-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--aqua-600);
+}
+.explore-card-placeholder svg {
+    width: 72px;
+    height: 72px;
+    opacity: 0.55;
+}
+.explore-card-placeholder--plants { background: linear-gradient(145deg, #d1fae5 0%, #ecfdf5 100%); color: #059669; }
+.explore-card-placeholder--tools { background: linear-gradient(145deg, #e0f2fe 0%, #f0f9ff 100%); color: #0891b2; }
+.explore-card-placeholder--foods { background: linear-gradient(145deg, #fef3c7 0%, #fffbeb 100%); color: #d97706; }
+.explore-card-body {
+    padding: 1.35rem 1.5rem 1.6rem;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
 }
 .explore-card-title {
-    font-size: 2.25rem;
+    font-size: 1.5rem;
     font-weight: 700;
     color: var(--slate-900);
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.4rem;
+    letter-spacing: -0.02em;
 }
 .explore-card-desc {
-    font-size: 1.125rem;
+    font-size: 0.9375rem;
     color: var(--slate-600);
     line-height: 1.5;
+    flex: 1;
 }
 .explore-card-btn {
     display: inline-block;
-    margin-top: 1.25rem;
-    padding: 0.6rem 1.5rem;
+    margin-top: 1rem;
+    align-self: flex-start;
+    padding: 0.55rem 1.15rem;
     background: linear-gradient(135deg, var(--aqua-600), var(--aqua-500));
     color: white !important;
     font-weight: 600;
-    font-size: 1rem;
+    font-size: 0.875rem;
     border-radius: 10px;
-    transition: all 0.2s ease;
+    transition: box-shadow 0.2s ease;
 }
 .explore-card:hover .explore-card-btn {
     box-shadow: 0 4px 14px rgba(6, 182, 212, 0.4);

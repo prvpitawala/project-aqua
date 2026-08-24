@@ -424,6 +424,22 @@ def get_contact_messages_paginated(page=1, per_page=15):
         return [], 0, 1, 1
 
 
+def get_contact_message_by_id(message_id):
+    """Fetch a single contact message by id."""
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                'SELECT id, name, email, subject, message, created_at FROM contact_messages WHERE id = %s',
+                (message_id,),
+            )
+            row = cur.fetchone()
+        conn.close()
+        return dict(row) if row else None
+    except Exception:
+        return None
+
+
 def save_contact_message(name, email, subject, message):
     """Save a contact form message to the database. Returns (id, None) or (None, error)."""
     try:
@@ -439,6 +455,241 @@ def save_contact_message(name, email, subject, message):
         return (new_id, None)
     except Exception as e:
         return (None, str(e))
+
+
+def ensure_orders_tables():
+    """Create orders tables if they do not exist yet."""
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                '''
+                CREATE TABLE IF NOT EXISTS orders (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    customer_name VARCHAR(200) NOT NULL,
+                    customer_email VARCHAR(255) NOT NULL,
+                    customer_phone VARCHAR(50) DEFAULT NULL,
+                    delivery_address TEXT DEFAULT NULL,
+                    notes TEXT DEFAULT NULL,
+                    subtotal DECIMAL(10, 2) NOT NULL DEFAULT 0,
+                    delivery_fee DECIMAL(10, 2) NOT NULL DEFAULT 0,
+                    total DECIMAL(10, 2) NOT NULL DEFAULT 0,
+                    status VARCHAR(40) NOT NULL DEFAULT 'pending',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                '''
+            )
+            cur.execute(
+                '''
+                CREATE TABLE IF NOT EXISTS order_items (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    order_id INT NOT NULL,
+                    product_type VARCHAR(20) NOT NULL,
+                    product_id INT NOT NULL,
+                    product_name VARCHAR(200) NOT NULL,
+                    unit_price DECIMAL(10, 2) NOT NULL,
+                    quantity INT NOT NULL DEFAULT 1,
+                    line_total DECIMAL(10, 2) NOT NULL,
+                    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+                )
+                '''
+            )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
+def create_order(customer_name, customer_email, customer_phone, delivery_address, notes, items):
+    """
+    Save a customer order and line items.
+    items: list of dicts with keys type, id, name, price, quantity, weightKg (optional).
+    Returns (order_id, None) or (None, error_message).
+    """
+    if not customer_name or not customer_email:
+        return (None, 'Name and email are required.')
+    if not items:
+        return (None, 'Cart is empty.')
+
+    ensure_orders_tables()
+
+    subtotal = 0.0
+    total_weight = 0.0
+    normalized = []
+    for item in items:
+        try:
+            qty = int(item.get('quantity', 1))
+        except (TypeError, ValueError):
+            qty = 1
+        if qty < 1:
+            continue
+        try:
+            price = float(item.get('price', 0))
+        except (TypeError, ValueError):
+            price = 0.0
+        name = (item.get('name') or '').strip()
+        product_type = (item.get('type') or 'product').strip().lower()
+        try:
+            product_id = int(item.get('id', 0))
+        except (TypeError, ValueError):
+            product_id = 0
+        if not name:
+            continue
+        try:
+            weight_kg = float(item.get('weightKg') or 0)
+        except (TypeError, ValueError):
+            weight_kg = 0.0
+        line_total = price * qty
+        subtotal += line_total
+        total_weight += weight_kg * qty
+        normalized.append({
+            'product_type': product_type,
+            'product_id': product_id,
+            'product_name': name,
+            'unit_price': price,
+            'quantity': qty,
+            'line_total': line_total,
+        })
+
+    if not normalized:
+        return (None, 'No valid items in cart.')
+
+    delivery_fee = float(calculate_delivery_by_weight(total_weight))
+    total = subtotal + delivery_fee
+
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                '''
+                INSERT INTO orders (
+                    customer_name, customer_email, customer_phone, delivery_address, notes,
+                    subtotal, delivery_fee, total, status
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ''',
+                (
+                    customer_name.strip(),
+                    customer_email.strip(),
+                    (customer_phone or '').strip() or None,
+                    (delivery_address or '').strip() or None,
+                    (notes or '').strip() or None,
+                    round(subtotal, 2),
+                    round(delivery_fee, 2),
+                    round(total, 2),
+                    'pending',
+                ),
+            )
+            order_id = cur.lastrowid
+            for row in normalized:
+                cur.execute(
+                    '''
+                    INSERT INTO order_items (
+                        order_id, product_type, product_id, product_name,
+                        unit_price, quantity, line_total
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ''',
+                    (
+                        order_id,
+                        row['product_type'],
+                        row['product_id'],
+                        row['product_name'],
+                        row['unit_price'],
+                        row['quantity'],
+                        row['line_total'],
+                    ),
+                )
+        conn.commit()
+        conn.close()
+        return (order_id, None)
+    except Exception as e:
+        return (None, str(e))
+
+
+def get_orders_paginated(page=1, per_page=15):
+    """Fetch one page of orders. Returns (orders, total, total_pages, current_page)."""
+    ensure_orders_tables()
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute('SELECT COUNT(*) AS n FROM orders')
+            total = int(cur.fetchone()['n'])
+            total_pages = max(1, (total + per_page - 1) // per_page) if total else 1
+            page = max(1, min(int(page), total_pages))
+            offset = (page - 1) * per_page
+            cur.execute(
+                '''
+                SELECT o.id, o.customer_name, o.customer_email, o.customer_phone,
+                       o.subtotal, o.delivery_fee, o.total, o.status, o.created_at,
+                       COUNT(oi.id) AS item_count
+                FROM orders o
+                LEFT JOIN order_items oi ON oi.order_id = o.id
+                GROUP BY o.id
+                ORDER BY o.created_at DESC
+                LIMIT %s OFFSET %s
+                ''',
+                (int(per_page), int(offset)),
+            )
+            rows = cur.fetchall()
+        conn.close()
+        return [dict(r) for r in rows] if rows else [], total, total_pages, page
+    except Exception:
+        return [], 0, 1, 1
+
+
+def get_order_by_id(order_id):
+    """Fetch a single order with its line items."""
+    ensure_orders_tables()
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                '''
+                SELECT id, customer_name, customer_email, customer_phone,
+                       delivery_address, notes, subtotal, delivery_fee, total,
+                       status, created_at
+                FROM orders WHERE id = %s
+                ''',
+                (order_id,),
+            )
+            order = cur.fetchone()
+            if not order:
+                conn.close()
+                return None
+            cur.execute(
+                '''
+                SELECT id, product_type, product_id, product_name,
+                       unit_price, quantity, line_total
+                FROM order_items WHERE order_id = %s ORDER BY id
+                ''',
+                (order_id,),
+            )
+            items = cur.fetchall()
+        conn.close()
+        result = dict(order)
+        result['items'] = [dict(i) for i in items] if items else []
+        return result
+    except Exception:
+        return None
+
+
+def update_order_status(order_id, status):
+    """Update order status. Returns True on success."""
+    allowed = {'pending', 'completed', 'cancelled'}
+    status = (status or '').strip().lower()
+    if status not in allowed:
+        return False
+    ensure_orders_tables()
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute('UPDATE orders SET status = %s WHERE id = %s', (status, order_id))
+            updated = cur.rowcount > 0
+        conn.commit()
+        conn.close()
+        return updated
+    except Exception:
+        return False
 
 
 def _get_item_image(table, item_id, slot):

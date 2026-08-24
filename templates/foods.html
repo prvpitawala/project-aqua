@@ -211,7 +211,7 @@
                         <div class="product-info-row">
                             <span class="product-price">LKR {{ "%.2f"|format(item.price) }}</span>
                             {% if item.in_stock | default(true) %}
-                            <button type="button" class="cart-icon-btn btn-add-cart" data-name="{{ item.name }}" data-price="{{ item.price }}" data-image="{{ item.image }}" data-weight="{{ item.weight or 0 }}" title="Add to cart">
+                            <button type="button" class="cart-icon-btn btn-add-cart" data-id="{{ item.id }}" data-type="food" data-name="{{ item.name }}" data-price="{{ item.price }}" data-image="{{ item.image }}" data-weight="{{ item.weight or '' }}" title="Add to cart">
                                 <span class="cart-label">Add to cart</span>
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 2a1 1 0 0 0-.9.6L2.2 9.4A1 1 0 0 0 3 11h1.4l1.8 9.2a1 1 0 0 0 1 .8h9.6a1 1 0 0 0 1-.8L18.6 11H21a1 1 0 0 0 .8-1.6L18.9 2.6A1 1 0 0 0 18 2H6zm3.2 9h5.6l-1.2 6H10.4L9.2 11z"/></svg>
                             </button>
@@ -250,15 +250,6 @@
     }
     document.querySelectorAll('.filter-stock, .filter-category').forEach(function(cb) {
         cb.addEventListener('change', applyPublicFilters);
-    });
-
-    grid.addEventListener('click', function(e) {
-        var btn = e.target.closest('.btn-add-cart');
-        if (btn && !btn.classList.contains('btn-add-cart-disabled')) {
-            e.preventDefault();
-            e.stopPropagation();
-            AquaCart.add(btn.dataset.name, Number.parseFloat(btn.dataset.price), btn.dataset.image || '', btn.dataset.weight);
-        }
     });
 })();
 </script>

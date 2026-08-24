@@ -1,56 +1,125 @@
 {% extends "partials/base.html" %}
 
-{% block title %}Weight-based delivery prices - AquaStore Admin{% endblock %}
+{% block title %}Delivery Prices - AquaStore Admin{% endblock %}
 
 {% block content %}
-<div class="page-header admin-header">
-    <div>
-        <a href="{{ url_for('admin_dashboard') }}" class="back-link">Dashboard</a>
-        <h1>Weight-based delivery prices</h1>
-        <p>Set base delivery price and charge per extra kg</p>
+<div class="admin-page">
+    <div class="admin-page-top">
+        <div>
+            <a href="{{ url_for('admin_dashboard') }}" class="back-link">Dashboard</a>
+            <h1>Delivery Prices</h1>
+            <p>Configure weight-based delivery charges for cart checkout</p>
+        </div>
+    </div>
+
+    {% if message %}
+    <div class="admin-alert admin-alert-{{ message_type or 'success' }}">{{ message }}</div>
+    {% endif %}
+
+    <div class="admin-stat-row">
+        <div class="admin-stat-card">
+            <div class="admin-stat-icon aqua">⚖️</div>
+            <div>
+                <div class="admin-stat-label">Base weight</div>
+                <div class="admin-stat-value">{{ base_rule.max_weight_kg|round(2) }} kg</div>
+                <div class="admin-stat-hint">Included in base price</div>
+            </div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="admin-stat-icon green">💰</div>
+            <div>
+                <div class="admin-stat-label">Base price</div>
+                <div class="admin-stat-value">LKR {{ base_rule.base_price|round(0)|int }}</div>
+                <div class="admin-stat-hint">Up to base weight</div>
+            </div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="admin-stat-icon blue">📈</div>
+            <div>
+                <div class="admin-stat-label">Extra per kg</div>
+                <div class="admin-stat-value">LKR {{ base_rule.extra_per_kg|round(0)|int }}</div>
+                <div class="admin-stat-hint">Each additional kg</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="admin-form-layout">
+        <div class="admin-form-card">
+            <div class="admin-form-card-head">
+                <h2>How pricing works</h2>
+                <p>Used automatically in cart and checkout</p>
+            </div>
+            <div class="admin-form-card-body">
+                <div class="admin-preview-box">
+                    <strong>Current rule</strong>
+                    <p>
+                        Orders up to <strong>{{ base_rule.max_weight_kg|round(2) }} kg</strong> cost
+                        <strong>LKR {{ base_rule.base_price|round(2) }}</strong>.
+                        Each extra full kilogram adds <strong>LKR {{ base_rule.extra_per_kg|round(2) }}</strong>.
+                    </p>
+                </div>
+                <ul class="admin-example-list" id="deliveryExamples">
+                    <li><span>{{ base_rule.max_weight_kg|round(2) }} kg (base)</span><span id="exBase">—</span></li>
+                    <li><span>{{ (base_rule.max_weight_kg + 1)|round(2) }} kg</span><span id="exPlus1">—</span></li>
+                    <li><span>{{ (base_rule.max_weight_kg + 2.5)|round(2) }} kg</span><span id="exPlus25">—</span></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="admin-form-card">
+            <div class="admin-form-card-head">
+                <h2>Edit delivery rule</h2>
+                <p>Changes apply to new checkout estimates immediately</p>
+            </div>
+            <div class="admin-form-card-body">
+                <form method="post" action="{{ url_for('admin_delivery_prices') }}" class="delivery-form">
+                    <div class="admin-form-grid">
+                        <div class="admin-field">
+                            <label for="max_weight_kg">Up to weight (kg)</label>
+                            <input type="number" id="max_weight_kg" name="max_weight_kg" step="0.01" min="0" value="{{ base_rule.max_weight_kg|round(2) }}" required>
+                        </div>
+                        <div class="admin-field">
+                            <label for="base_price">Base price (LKR)</label>
+                            <input type="number" id="base_price" name="base_price" step="0.01" min="0" value="{{ base_rule.base_price|round(2) }}" required>
+                        </div>
+                        <div class="admin-field">
+                            <label for="extra_per_kg">Per extra kg (LKR)</label>
+                            <input type="number" id="extra_per_kg" name="extra_per_kg" step="0.01" min="0" value="{{ base_rule.extra_per_kg|round(2) }}" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="admin-btn-primary">Save delivery rule</button>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 
-{% if message %}
-<div class="alert alert-{{ message_type }}">{{ message }}</div>
-{% endif %}
+{% include 'partials/admin_ui_styles.html' %}
+{% endblock %}
 
-<div class="base-rule-card card">
-    <h2 class="form-card-title">Base + per kg rule (main delivery rule)</h2>
-    <p class="base-rule-desc">Under <strong>{{ base_rule.max_weight_kg|round(2) }} kg</strong>: <strong>LKR {{ base_rule.base_price|round(2) }}</strong>. Each extra <strong>1 kg</strong>: <strong>LKR {{ base_rule.extra_per_kg|round(2) }}</strong>.</p>
-    <form method="post" action="{{ url_for('admin_delivery_prices') }}" class="delivery-form base-rule-form">
-        <div class="form-row three-cols">
-            <div class="form-group">
-                <label for="max_weight_kg">Up to weight (kg) *</label>
-                <input type="number" id="max_weight_kg" name="max_weight_kg" step="0.01" min="0" value="{{ base_rule.max_weight_kg|round(2) }}" required placeholder="1.5">
-            </div>
-            <div class="form-group">
-                <label for="base_price">Base price (LKR) *</label>
-                <input type="number" id="base_price" name="base_price" step="0.01" min="0" value="{{ base_rule.base_price|round(2) }}" required placeholder="450">
-            </div>
-            <div class="form-group">
-                <label for="extra_per_kg">Per extra kg (LKR) *</label>
-                <input type="number" id="extra_per_kg" name="extra_per_kg" step="0.01" min="0" value="{{ base_rule.extra_per_kg|round(2) }}" required placeholder="100">
-            </div>
-        </div>
-        <button type="submit" class="btn-submit">Update base rule</button>
-    </form>
-</div>
-
-<style>
-.alert { padding: 1rem 1.25rem; border-radius: 12px; margin-bottom: 1rem; }
-.alert-success { background: #d1fae5; color: #065f46; }
-.alert-error { background: #fee2e2; color: #b91c1c; }
-.form-card-title { font-size: 1.125rem; font-weight: 700; color: var(--slate-900); margin: 0 0 1rem 0; }
-.base-rule-card { margin-bottom: 1.5rem; padding: 1.5rem; max-width: 560px; }
-.base-rule-desc { font-size: 0.9375rem; color: var(--slate-600); margin: 0 0 1rem 0; line-height: 1.5; }
-.base-rule-form .form-row.three-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
-@media (max-width: 640px) { .base-rule-form .form-row.three-cols { grid-template-columns: 1fr; } }
-.delivery-form .form-group { margin-bottom: 1rem; }
-.delivery-form label { display: block; margin-bottom: 0.4rem; font-weight: 600; font-size: 0.875rem; color: var(--slate-800); }
-.delivery-form input { width: 100%; padding: 0.6rem 0.9rem; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 0.9375rem; }
-.delivery-form input:focus { outline: none; border-color: var(--aqua-500); }
-.btn-submit { padding: 0.65rem 1.25rem; background: linear-gradient(135deg, var(--aqua-600), var(--aqua-500)); color: white; border: none; border-radius: 10px; font-size: 0.9375rem; font-weight: 600; cursor: pointer; font-family: inherit; }
-.btn-submit:hover { opacity: 0.9; }
-</style>
+{% block extra_js %}
+<script>
+(function() {
+    function calcDelivery(weightKg, maxW, base, extra) {
+        if (weightKg <= maxW) return base;
+        return base + Math.ceil(weightKg - maxW) * extra;
+    }
+    function formatLkr(n) {
+        return 'LKR ' + n.toFixed(2);
+    }
+    function updateExamples() {
+        var maxW = Number.parseFloat(document.getElementById('max_weight_kg').value) || 0;
+        var base = Number.parseFloat(document.getElementById('base_price').value) || 0;
+        var extra = Number.parseFloat(document.getElementById('extra_per_kg').value) || 0;
+        document.getElementById('exBase').textContent = formatLkr(calcDelivery(maxW, maxW, base, extra));
+        document.getElementById('exPlus1').textContent = formatLkr(calcDelivery(maxW + 1, maxW, base, extra));
+        document.getElementById('exPlus25').textContent = formatLkr(calcDelivery(maxW + 2.5, maxW, base, extra));
+    }
+    ['max_weight_kg', 'base_price', 'extra_per_kg'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('input', updateExamples);
+    });
+    updateExamples();
+})();
+</script>
 {% endblock %}

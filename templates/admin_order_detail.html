@@ -1,0 +1,194 @@
+{% extends "partials/base.html" %}
+
+{% block title %}Order #{{ order.id }} - AquaStore Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{{ url_for('admin_orders') }}" class="back-link">All orders</a>
+    <h1>Order #{{ order.id }}</h1>
+    <p>Placed {{ order.created_at.strftime('%b %d, %Y at %H:%M') if order.created_at else '—' }}</p>
+</div>
+
+{% if message %}
+<div class="alert alert-{{ message_type or 'success' }}">{{ message }}</div>
+{% endif %}
+
+<div class="order-detail-layout">
+    <div class="order-card">
+        <h2>Customer</h2>
+        <dl class="detail-list">
+            <dt>Name</dt><dd>{{ order.customer_name }}</dd>
+            <dt>Email</dt><dd><a href="mailto:{{ order.customer_email }}">{{ order.customer_email }}</a></dd>
+            {% if order.customer_phone %}
+            <dt>Phone</dt><dd><a href="tel:{{ order.customer_phone }}">{{ order.customer_phone }}</a></dd>
+            {% endif %}
+            {% if order.delivery_address %}
+            <dt>Address</dt><dd>{{ order.delivery_address }}</dd>
+            {% endif %}
+            {% if order.notes %}
+            <dt>Notes</dt><dd>{{ order.notes }}</dd>
+            {% endif %}
+        </dl>
+    </div>
+
+    <div class="order-card">
+        <h2>Status</h2>
+        <form method="post" class="status-form">
+            <select name="status" class="status-select">
+                {% for value in ['pending', 'completed', 'cancelled'] %}
+                <option value="{{ value }}" {{ 'selected' if order.status == value else '' }}>{{ value|capitalize }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn-update">Update status</button>
+        </form>
+        <p class="status-current">Current: <span class="status-badge status-{{ order.status }}">{{ order.status|capitalize }}</span></p>
+    </div>
+</div>
+
+<div class="order-card order-items-card">
+    <h2>Items</h2>
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Type</th>
+                <th>Unit price</th>
+                <th>Qty</th>
+                <th>Line total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in order.items %}
+            <tr>
+                <td>{{ item.product_name }}</td>
+                <td>{{ item.product_type|capitalize }}</td>
+                <td>LKR {{ "%.2f"|format(item.unit_price) }}</td>
+                <td>{{ item.quantity }}</td>
+                <td class="line-total">LKR {{ "%.2f"|format(item.line_total) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <div class="order-totals">
+        <div class="order-total-row"><span>Subtotal</span><span>LKR {{ "%.2f"|format(order.subtotal) }}</span></div>
+        <div class="order-total-row"><span>Delivery</span><span>LKR {{ "%.2f"|format(order.delivery_fee) }}</span></div>
+        <div class="order-total-row order-grand-total"><span>Total</span><span>LKR {{ "%.2f"|format(order.total) }}</span></div>
+    </div>
+</div>
+
+<style>
+.order-detail-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+@media (max-width: 768px) {
+    .order-detail-layout { grid-template-columns: 1fr; }
+}
+.order-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.order-card h2 {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--slate-900);
+    margin-bottom: 1rem;
+}
+.detail-list {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 0.5rem 1rem;
+    font-size: 0.9375rem;
+}
+.detail-list dt { color: var(--slate-500); font-weight: 600; }
+.detail-list dd { color: var(--slate-800); margin: 0; }
+.detail-list a { color: var(--aqua-600); text-decoration: none; }
+.detail-list a:hover { text-decoration: underline; }
+.status-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+.status-select {
+    padding: 0.55rem 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 0.9375rem;
+}
+.btn-update {
+    padding: 0.55rem 1rem;
+    background: linear-gradient(135deg, var(--aqua-600), var(--aqua-500));
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+}
+.status-current { font-size: 0.875rem; color: var(--slate-600); }
+.status-badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+}
+.status-pending { background: #fef3c7; color: #92400e; }
+.status-completed { background: #d1fae5; color: #065f46; }
+.status-cancelled { background: #fee2e2; color: #b91c1c; }
+.order-items-card { margin-top: 0; }
+.items-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+.items-table th, .items-table td {
+    padding: 0.7rem 0.5rem;
+    text-align: left;
+    border-bottom: 1px solid #e2e8f0;
+}
+.items-table th {
+    font-weight: 600;
+    color: var(--slate-700);
+    background: #f8fafc;
+}
+.line-total { font-weight: 700; color: var(--aqua-600); }
+.order-totals {
+    margin-top: 1rem;
+    max-width: 320px;
+    margin-left: auto;
+}
+.order-total-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9375rem;
+    color: var(--slate-600);
+    margin-bottom: 0.35rem;
+}
+.order-grand-total {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: var(--slate-900);
+    padding-top: 0.5rem;
+    border-top: 1px solid #e2e8f0;
+    margin-top: 0.5rem;
+}
+.order-grand-total span:last-child { color: var(--aqua-600); }
+.alert {
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    margin-bottom: 1rem;
+    font-size: 0.9375rem;
+}
+.alert-success { background: #ecfdf5; color: #047857; }
+.alert-error { background: #fef2f2; color: #b91c1c; }
+</style>
+{% endblock %}

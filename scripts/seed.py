@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import sys
 import urllib.error
@@ -143,6 +144,8 @@ def fetch_image(seed: str, use_network: bool) -> tuple[bytes, str]:
 def reset_tables(cur) -> None:
     cur.execute("SET FOREIGN_KEY_CHECKS = 0")
     for table in (
+        "order_items",
+        "orders",
         "contact_messages",
         "plants",
         "tools",
@@ -174,19 +177,23 @@ def seed_delivery_settings(cur) -> None:
 
 
 def seed_contact_messages(cur) -> None:
-    base_time = datetime.now() - timedelta(days=14)
+    base_time = datetime.now() - timedelta(days=21)
     messages = [
-        ("Aqua Customer", "customer1@example.com", "Plant availability", "Do you have Anubias in stock this week?"),
-        ("Sam Perera", "sam.perera@example.com", "Delivery question", "How much is delivery for a 2 kg order to Colombo?"),
-        ("Nimali Jay", "nimali@example.com", "Bulk order", "Can I place a bulk order for carpeting plants?"),
-        ("Ravi Kumar", "ravi@example.com", "CO2 setup", "Which accessories do you recommend for a beginner CO2 kit?"),
-        ("Dilani Silva", "dilani@example.com", "Food recommendation", "What food is best for neon tetras and shrimp together?"),
-        ("Guest User", "guest@example.com", "Store hours", "What are your opening hours on weekends?"),
-        ("Kasun Mendis", "kasun@example.com", "Order follow-up", "I placed an order yesterday. Can you confirm dispatch?"),
-        ("Ishara Fonseka", "ishara@example.com", "Plant care", "How much light does Dwarf Hairgrass need?"),
+        ("Aqua Customer", "customer1@example.com", "Plant availability", "Do you have Anubias nana and Java fern in stock this week? I am setting up a 60 cm community tank."),
+        ("Sam Perera", "sam.perera@example.com", "Delivery question", "How much is delivery for a 2 kg order to Colombo? I need it before the weekend if possible."),
+        ("Nimali Jay", "nimali@example.com", "Bulk order", "Can I place a bulk order for carpeting plants? I need about 20 pots for a shop display tank."),
+        ("Ravi Kumar", "ravi@example.com", "CO2 setup", "Which accessories do you recommend for a beginner CO2 kit? My tank is 45 litres with medium light."),
+        ("Dilani Silva", "dilani@example.com", "Food recommendation", "What food is best for neon tetras and cherry shrimp together? I want something that will not cloud the water."),
+        ("Guest User", "guest@example.com", "Store hours", "What are your opening hours on weekends? Can I collect an order in person?"),
+        ("Kasun Mendis", "kasun@example.com", "Order follow-up", "I placed an order yesterday. Can you confirm dispatch and share the tracking details?"),
+        ("Ishara Fonseka", "ishara@example.com", "Plant care", "How much light does Dwarf Hairgrass need? I have a low-tech setup without CO2."),
+        ("Tharindu W.", "tharindu@example.com", "Filter media", "Do you stock Seachem Purigen or a similar alternative for a hang-on-back filter?"),
+        ("Maya Rodrigo", "maya@example.com", "Shrimp safe plants", "Looking for moss and floating plants safe for a shrimp breeding tank. Any bundles available?"),
+        ("Anil Fernando", "anil@example.com", "Payment options", "Can I pay by bank transfer for a large accessories order? Please send your account details."),
+        ("Priya Dissanayake", "priya@example.com", "Damaged delivery", "One plant arrived with broken leaves. How do I request a replacement or refund?"),
     ]
     for index, (name, email, subject, message) in enumerate(messages, start=1):
-        created_at = base_time + timedelta(days=index)
+        created_at = base_time + timedelta(days=index, hours=index % 8)
         cur.execute(
             """
             INSERT INTO contact_messages (name, email, subject, message, created_at)
@@ -195,6 +202,226 @@ def seed_contact_messages(cur) -> None:
             (name, email, subject, message, created_at),
         )
     print(f"Seeded {len(messages)} contact messages.")
+
+
+def _catalog_samples(cur) -> dict:
+    """Fetch a few catalog rows per type for sample orders."""
+    samples: dict[str, list] = {"plant": [], "tool": [], "food": []}
+    cur.execute("SELECT id, name, price FROM plants ORDER BY id LIMIT 6")
+    samples["plant"] = list(cur.fetchall())
+    cur.execute("SELECT id, name, price FROM tools ORDER BY id LIMIT 6")
+    samples["tool"] = list(cur.fetchall())
+    cur.execute("SELECT id, name, price FROM foods ORDER BY id LIMIT 6")
+    samples["food"] = list(cur.fetchall())
+    return samples
+
+
+def seed_orders(cur) -> None:
+    """Insert sample customer orders linked to seeded catalog products."""
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS orders (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            customer_name VARCHAR(200) NOT NULL,
+            customer_email VARCHAR(255) NOT NULL,
+            customer_phone VARCHAR(50) DEFAULT NULL,
+            delivery_address TEXT DEFAULT NULL,
+            notes TEXT DEFAULT NULL,
+            subtotal DECIMAL(10, 2) NOT NULL DEFAULT 0,
+            delivery_fee DECIMAL(10, 2) NOT NULL DEFAULT 0,
+            total DECIMAL(10, 2) NOT NULL DEFAULT 0,
+            status VARCHAR(40) NOT NULL DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS order_items (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            order_id INT NOT NULL,
+            product_type VARCHAR(20) NOT NULL,
+            product_id INT NOT NULL,
+            product_name VARCHAR(200) NOT NULL,
+            unit_price DECIMAL(10, 2) NOT NULL,
+            quantity INT NOT NULL DEFAULT 1,
+            line_total DECIMAL(10, 2) NOT NULL,
+            FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+        )
+        """
+    )
+
+    catalog = _catalog_samples(cur)
+    if not catalog["plant"] and not catalog["tool"] and not catalog["food"]:
+        print("Skipped orders: no catalog products found.")
+        return
+
+    def item(product_type: str, index: int, quantity: int) -> dict | None:
+        rows = catalog.get(product_type) or []
+        if not rows:
+            return None
+        row = rows[index % len(rows)]
+        price = float(row["price"])
+        return {
+            "product_type": product_type,
+            "product_id": int(row["id"]),
+            "product_name": row["name"],
+            "unit_price": price,
+            "quantity": quantity,
+            "line_total": round(price * quantity, 2),
+            "weight_kg": 0.15 * quantity,
+        }
+
+    sample_orders = [
+        {
+            "customer_name": "Sam Perera",
+            "customer_email": "sam.perera@example.com",
+            "customer_phone": "+94 77 123 4567",
+            "delivery_address": "42 Lake Road, Colombo 05",
+            "notes": "Please call before delivery.",
+            "status": "pending",
+            "days_ago": 1,
+            "lines": [( "plant", 0, 2), ("food", 1, 1)],
+        },
+        {
+            "customer_name": "Nimali Jay",
+            "customer_email": "nimali@example.com",
+            "customer_phone": "+94 71 555 0192",
+            "delivery_address": "18 Station Avenue, Kandy",
+            "notes": None,
+            "status": "completed",
+            "days_ago": 3,
+            "lines": [("plant", 2, 3), ("tool", 0, 1)],
+        },
+        {
+            "customer_name": "Ravi Kumar",
+            "customer_email": "ravi@example.com",
+            "customer_phone": "+94 76 882 3344",
+            "delivery_address": "7 Beach Side, Negombo",
+            "notes": "Leave with security if not home.",
+            "status": "completed",
+            "days_ago": 6,
+            "lines": [("tool", 2, 2), ("food", 0, 2), ("food", 3, 1)],
+        },
+        {
+            "customer_name": "Dilani Silva",
+            "customer_email": "dilani@example.com",
+            "customer_phone": "+94 70 441 2200",
+            "delivery_address": "3/5 Temple Lane, Galle",
+            "notes": None,
+            "status": "completed",
+            "days_ago": 9,
+            "lines": [("plant", 4, 1), ("plant", 5, 2)],
+        },
+        {
+            "customer_name": "Kasun Mendis",
+            "customer_email": "kasun@example.com",
+            "customer_phone": "+94 78 990 1122",
+            "delivery_address": "55 High Level Road, Maharagama",
+            "notes": "Gift wrap if possible.",
+            "status": "pending",
+            "days_ago": 2,
+            "lines": [("food", 2, 3), ("tool", 4, 1)],
+        },
+        {
+            "customer_name": "Ishara Fonseka",
+            "customer_email": "ishara@example.com",
+            "customer_phone": None,
+            "delivery_address": "12 Hill Street, Nuwara Eliya",
+            "notes": "Email invoice only.",
+            "status": "cancelled",
+            "days_ago": 12,
+            "lines": [("plant", 1, 1), ("tool", 1, 1)],
+        },
+        {
+            "customer_name": "Maya Rodrigo",
+            "customer_email": "maya@example.com",
+            "customer_phone": "+94 77 604 8899",
+            "delivery_address": "9 Park View, Dehiwala",
+            "notes": "Deliver after 5 PM on weekdays.",
+            "status": "completed",
+            "days_ago": 4,
+            "lines": [("plant", 3, 2), ("food", 4, 2), ("tool", 3, 1)],
+        },
+        {
+            "customer_name": "Anil Fernando",
+            "customer_email": "anil@example.com",
+            "customer_phone": "+94 75 300 7788",
+            "delivery_address": "22 Main Street, Jaffna",
+            "notes": None,
+            "status": "pending",
+            "days_ago": 0,
+            "lines": [("tool", 5, 1), ("food", 5, 4)],
+        },
+    ]
+
+    base_delivery = 450.0
+    extra_per_kg = 100.0
+    max_weight = 1.5
+
+    def delivery_for_weight(total_weight: float) -> float:
+        if total_weight <= max_weight:
+            return base_delivery
+        return base_delivery + math.ceil(total_weight - max_weight) * extra_per_kg
+
+    created = 0
+    for order_data in sample_orders:
+        lines = []
+        for product_type, index, quantity in order_data["lines"]:
+            row = item(product_type, index, quantity)
+            if row:
+                lines.append(row)
+        if not lines:
+            continue
+
+        subtotal = round(sum(line["line_total"] for line in lines), 2)
+        total_weight = sum(line["weight_kg"] for line in lines)
+        delivery_fee = round(delivery_for_weight(total_weight), 2)
+        total = round(subtotal + delivery_fee, 2)
+        created_at = datetime.now() - timedelta(days=order_data["days_ago"], hours=order_data["days_ago"] * 2)
+
+        cur.execute(
+            """
+            INSERT INTO orders (
+                customer_name, customer_email, customer_phone, delivery_address, notes,
+                subtotal, delivery_fee, total, status, created_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                order_data["customer_name"],
+                order_data["customer_email"],
+                order_data["customer_phone"],
+                order_data["delivery_address"],
+                order_data["notes"],
+                subtotal,
+                delivery_fee,
+                total,
+                order_data["status"],
+                created_at,
+            ),
+        )
+        order_id = cur.lastrowid
+        for line in lines:
+            cur.execute(
+                """
+                INSERT INTO order_items (
+                    order_id, product_type, product_id, product_name,
+                    unit_price, quantity, line_total
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    order_id,
+                    line["product_type"],
+                    line["product_id"],
+                    line["product_name"],
+                    line["unit_price"],
+                    line["quantity"],
+                    line["line_total"],
+                ),
+            )
+        created += 1
+
+    print(f"Seeded {created} sample orders with line items.")
 
 
 def insert_catalog_item(
@@ -363,6 +590,7 @@ def main() -> int:
             seed_plants(cur, use_images)
             seed_tools(cur, use_images)
             seed_foods(cur, use_images)
+            seed_orders(cur)
         conn.commit()
     except Exception as exc:
         conn.rollback()
@@ -372,10 +600,12 @@ def main() -> int:
         conn.close()
 
     print("Seed completed successfully.")
-    print(f"  plants: {ITEM_COUNT}")
-    print(f"  tools:  {ITEM_COUNT}")
-    print(f"  foods:  {ITEM_COUNT}")
-    print(f"  admin:  {args.admin_user} / {args.admin_password}")
+    print(f"  plants:   {ITEM_COUNT}")
+    print(f"  tools:    {ITEM_COUNT}")
+    print(f"  foods:    {ITEM_COUNT}")
+    print(f"  messages: 12")
+    print(f"  orders:   8")
+    print(f"  admin:    {args.admin_user} / {args.admin_password}")
     return 0
 
 

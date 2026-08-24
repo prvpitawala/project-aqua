@@ -1,0 +1,123 @@
+{% extends "partials/base.html" %}
+
+{% block title %}Customer Orders - AquaStore Admin{% endblock %}
+
+{% block content %}
+<div class="admin-page">
+    <div class="admin-page-top">
+        <div>
+            <a href="{{ url_for('admin_dashboard') }}" class="back-link">Dashboard</a>
+            <h1>Customer Orders</h1>
+            <p>Orders placed through cart checkout</p>
+        </div>
+        <div class="admin-toolbar">
+            <span class="admin-toolbar-label">Show</span>
+            <select id="per_page" class="admin-select" data-base-url="{{ url_for('admin_orders') }}">
+                {% for n in per_page_options %}
+                <option value="{{ n }}" {{ 'selected' if n == per_page else '' }}>{{ n }} / page</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <div class="admin-stat-row">
+        <div class="admin-stat-card">
+            <div class="admin-stat-icon aqua">🛒</div>
+            <div>
+                <div class="admin-stat-label">Total orders</div>
+                <div class="admin-stat-value">{{ total }}</div>
+                <div class="admin-stat-hint">All time</div>
+            </div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="admin-stat-icon amber">⏳</div>
+            <div>
+                <div class="admin-stat-label">On this page</div>
+                <div class="admin-stat-value">{{ orders|selectattr('status', 'equalto', 'pending')|list|length if orders else 0 }}</div>
+                <div class="admin-stat-hint">Pending status</div>
+            </div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="admin-stat-icon green">📦</div>
+            <div>
+                <div class="admin-stat-label">Showing</div>
+                <div class="admin-stat-value">{{ orders|length }}</div>
+                <div class="admin-stat-hint">Page {{ page }} of {{ total_pages }}</div>
+            </div>
+        </div>
+    </div>
+
+    {% if orders %}
+    <div class="admin-panel">
+        <div class="admin-panel-head">
+            <h2>Recent orders</h2>
+            <span>Sorted by newest first</span>
+        </div>
+        <div class="admin-table-wrap">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Order</th>
+                        <th>Customer</th>
+                        <th>Items</th>
+                        <th>Total</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td class="admin-cell-id">#{{ order.id }}</td>
+                        <td>
+                            <div class="admin-cell-name-wrap">
+                                <span class="admin-avatar" aria-hidden="true">{{ (order.customer_name or '?')[:1]|upper }}</span>
+                                <div>
+                                    <div class="admin-cell-name">{{ order.customer_name }}</div>
+                                    <a class="admin-link admin-cell-muted" href="mailto:{{ order.customer_email }}">{{ order.customer_email }}</a>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="admin-cell-muted">{{ order.item_count or 0 }} item{{ 's' if (order.item_count or 0) != 1 else '' }}</td>
+                        <td class="admin-cell-total">LKR {{ "%.2f"|format(order.total) }}</td>
+                        <td>
+                            <span class="admin-badge status-{{ order.status }}">{{ order.status|capitalize }}</span>
+                        </td>
+                        <td class="admin-cell-date">{{ order.created_at.strftime('%b %d, %Y · %H:%M') if order.created_at else '—' }}</td>
+                        <td>
+                            <a href="{{ url_for('admin_order_detail', order_id=order.id) }}" class="admin-btn">View</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% set pagination_endpoint = 'admin_orders' %}
+        {% set pagination_aria_label = 'Orders pagination' %}
+        {% set item_label = 'order' + ('s' if total != 1 else '') %}
+        {% include 'partials/admin_pagination_nav.html' %}
+    </div>
+    {% else %}
+    <div class="admin-empty">
+        <div class="admin-empty-icon">🛒</div>
+        <h2>No orders yet</h2>
+        <p>When customers place an order from checkout, it will show up here.</p>
+        <a href="{{ url_for('index') }}" class="admin-btn">View public site</a>
+    </div>
+    {% endif %}
+</div>
+
+{% include 'partials/admin_ui_styles.html' %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var perPageEl = document.getElementById('per_page');
+if (perPageEl) {
+    perPageEl.addEventListener('change', function() {
+        globalThis.location.href = this.dataset.baseUrl + '?per_page=' + this.value + '&page=1';
+    });
+}
+</script>
+{% endblock %}

@@ -3,127 +3,327 @@
 {% block title %}Contact Messages - AquaStore Admin{% endblock %}
 
 {% block content %}
-<div class="page-header admin-header">
-    <div>
-        <a href="{{ url_for('admin_dashboard') }}" class="back-link">Dashboard</a>
-        <h1>Contact Messages</h1>
-        <p>Messages sent from the contact form{% if total %} ({{ total }} total){% endif %}</p>
-    </div>
-    <div class="per-page-wrap">
-        <label for="per_page" class="per-page-label">Per page:</label>
-        <select id="per_page" class="per-page-select" data-base-url="{{ url_for('admin_messages') }}">
-            {% for n in per_page_options %}
-            <option value="{{ n }}" {{ 'selected' if n == per_page else '' }}>{{ n }}</option>
-            {% endfor %}
-        </select>
-    </div>
-</div>
-
-{% if messages %}
-<div class="messages-table-wrap card">
-    <table class="messages-table">
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Subject</th>
-                <th>Message</th>
-                <th>Date</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for msg in messages %}
-            <tr>
-                <td class="col-id">{{ msg.id }}</td>
-                <td class="col-name">{{ msg.name }}</td>
-                <td class="col-email"><a href="mailto:{{ msg.email }}">{{ msg.email }}</a></td>
-                <td class="col-subject">{{ msg.subject }}</td>
-                <td class="col-message" title="{{ msg.message }}">{{ (msg.message or '')[:80] }}{% if (msg.message or '')|length > 80 %}…{% endif %}</td>
-                <td class="col-date">{{ msg.created_at.strftime('%b %d, %Y %H:%M') if msg.created_at else '—' }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <nav class="pagination" aria-label="Messages pagination">
-        <div class="pagination-info">Page {{ page }} of {{ total_pages }} ({{ total }} message{{ 's' if total != 1 else '' }} total, {{ per_page }} per page)</div>
-        <div class="pagination-links">
-            {% if page > 1 %}
-            <a href="{{ url_for('admin_messages', page=page - 1) }}" class="pagination-btn">Previous</a>
-            {% else %}
-            <span class="pagination-btn disabled">Previous</span>
-            {% endif %}
-            {% if total_pages > 1 %}
-            {% set start = [1, page - 2]|max %}
-            {% set end = [total_pages, page + 2]|min %}
-            {% if start > 1 %}
-            <a href="{{ url_for('admin_messages', page=1) }}" class="pagination-btn">1</a>
-            {% if start > 2 %}<span class="pagination-ellipsis">…</span>{% endif %}
-            {% endif %}
-            {% for p in range(start, end + 1) %}
-            {% if p == page %}
-            <span class="pagination-btn active">{{ p }}</span>
-            {% else %}
-            <a href="{{ url_for('admin_messages', page=p) }}" class="pagination-btn">{{ p }}</a>
-            {% endif %}
-            {% endfor %}
-            {% if end < total_pages %}
-            {% if end < total_pages - 1 %}<span class="pagination-ellipsis">…</span>{% endif %}
-            <a href="{{ url_for('admin_messages', page=total_pages) }}" class="pagination-btn">{{ total_pages }}</a>
-            {% endif %}
-            {% endif %}
-            {% if page < total_pages %}
-            <a href="{{ url_for('admin_messages', page=page + 1) }}" class="pagination-btn">Next</a>
-            {% else %}
-            <span class="pagination-btn disabled">Next</span>
-            {% endif %}
+<div class="admin-page">
+    <div class="admin-page-top">
+        <div>
+            <a href="{{ url_for('admin_dashboard') }}" class="back-link">Dashboard</a>
+            <h1>Contact Messages</h1>
+            <p>Inquiries submitted through the public contact form</p>
         </div>
-    </nav>
-</div>
-{% else %}
-<div class="no-messages card">
-    <p>No contact messages yet.</p>
-    <a href="{{ url_for('contact') }}" class="back-link">View contact form</a>
-</div>
-{% endif %}
+        <div class="admin-toolbar">
+            <span class="admin-toolbar-label">Show</span>
+            <select id="per_page" class="admin-select" data-base-url="{{ url_for('admin_messages') }}">
+                {% for n in per_page_options %}
+                <option value="{{ n }}" {{ 'selected' if n == per_page else '' }}>{{ n }} / page</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
 
+    {% if notice %}
+    <div class="admin-alert admin-alert-{{ notice_type or 'success' }}">{{ notice }}</div>
+    {% endif %}
+
+    <div class="admin-stat-row">
+        <div class="admin-stat-card">
+            <div class="admin-stat-icon aqua">✉️</div>
+            <div>
+                <div class="admin-stat-label">Total messages</div>
+                <div class="admin-stat-value">{{ total }}</div>
+                <div class="admin-stat-hint">All time</div>
+            </div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="admin-stat-icon blue">📄</div>
+            <div>
+                <div class="admin-stat-label">This page</div>
+                <div class="admin-stat-value">{{ messages|length }}</div>
+                <div class="admin-stat-hint">Page {{ page }} of {{ total_pages }}</div>
+            </div>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="admin-panel">
+        <div class="admin-panel-head">
+            <h2>Inbox</h2>
+            <span>{{ total }} message{{ 's' if total != 1 else '' }}</span>
+        </div>
+        <div class="admin-table-wrap">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>From</th>
+                        <th>Subject</th>
+                        <th>Message</th>
+                        <th>Received</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for msg in messages %}
+                    <tr>
+                        <td class="admin-cell-id">#{{ msg.id }}</td>
+                        <td>
+                            <div class="admin-cell-name-wrap">
+                                <span class="admin-avatar" aria-hidden="true">{{ (msg.name or '?')[:1]|upper }}</span>
+                                <div>
+                                    <div class="admin-cell-name">{{ msg.name }}</div>
+                                    <a class="admin-link admin-cell-muted" href="mailto:{{ msg.email }}">{{ msg.email }}</a>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="admin-cell-subject">{{ msg.subject }}</td>
+                        <td class="admin-cell-preview" title="{{ msg.message }}">{{ msg.message }}</td>
+                        <td class="admin-cell-date">{{ msg.created_at.strftime('%b %d, %Y · %H:%M') if msg.created_at else '—' }}</td>
+                        <td>
+                            <button
+                                type="button"
+                                class="admin-btn msg-reply-btn"
+                                data-id="{{ msg.id }}"
+                                data-name="{{ msg.name|e }}"
+                                data-email="{{ msg.email|e }}"
+                                data-subject="{{ msg.subject|e }}"
+                                data-message="{{ msg.message|e }}"
+                            >Reply</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% set pagination_endpoint = 'admin_messages' %}
+        {% set pagination_aria_label = 'Messages pagination' %}
+        {% set item_label = 'message' + ('s' if total != 1 else '') %}
+        {% include 'partials/admin_pagination_nav.html' %}
+    </div>
+    {% else %}
+    <div class="admin-empty">
+        <div class="admin-empty-icon">✉️</div>
+        <h2>No messages yet</h2>
+        <p>When customers send a message from the contact page, it will appear here.</p>
+        <a href="{{ url_for('contact') }}" class="admin-btn">View contact form</a>
+    </div>
+    {% endif %}
+</div>
+
+<div id="replyModal" class="msg-reply-modal" aria-hidden="true">
+    <div class="msg-reply-overlay" data-close-reply></div>
+    <div class="msg-reply-dialog" role="dialog" aria-modal="true" aria-labelledby="replyModalTitle">
+        <div class="msg-reply-header">
+            <h2 id="replyModalTitle">Reply to message</h2>
+            <button type="button" class="msg-reply-close" data-close-reply aria-label="Close">&times;</button>
+        </div>
+        <form id="replyForm" method="post" action="">
+            <div class="msg-reply-body">
+                <div class="msg-reply-original">
+                    <div class="msg-reply-original-label">Original message</div>
+                    <div class="msg-reply-meta">
+                        <span id="replyToName"></span>
+                        <span id="replyToEmail" class="admin-cell-muted"></span>
+                    </div>
+                    <div id="replyOriginalSubject" class="msg-reply-original-subject"></div>
+                    <div id="replyOriginalMessage" class="msg-reply-original-text"></div>
+                </div>
+                <div class="msg-reply-field">
+                    <label for="reply_subject">Subject</label>
+                    <input type="text" id="reply_subject" name="reply_subject" required>
+                </div>
+                <div class="msg-reply-field">
+                    <label for="reply_body">Your reply</label>
+                    <textarea id="reply_body" name="reply_body" rows="6" required placeholder="Write your reply to the customer..."></textarea>
+                </div>
+                <p class="msg-reply-note">Email sending is not active yet. You can compose and save a reply for now.</p>
+            </div>
+            <div class="msg-reply-footer">
+                <button type="button" class="admin-btn" data-close-reply>Cancel</button>
+                <button type="submit" class="admin-btn-primary">Send reply</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% include 'partials/admin_ui_styles.html' %}
 <style>
-.admin-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 1rem; }
-.per-page-wrap { display: flex; align-items: center; gap: 0.5rem; }
-.per-page-label { font-size: 0.875rem; font-weight: 600; color: var(--slate-700); }
-.per-page-select { padding: 0.4rem 0.6rem; font-size: 0.875rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; font-family: inherit; cursor: pointer; }
-.per-page-select:focus { outline: none; border-color: var(--aqua-500); }
-.messages-table-wrap { padding: 0; overflow-x: auto; }
-.messages-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-.messages-table th, .messages-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #e2e8f0; }
-.messages-table th { font-weight: 600; color: var(--slate-700); background: #f8fafc; position: sticky; top: 0; }
-.messages-table tbody tr:hover { background: #f8fafc; }
-.messages-table .col-id { width: 3rem; color: var(--slate-500); }
-.messages-table .col-name { font-weight: 600; color: var(--slate-800); }
-.messages-table .col-email a { color: var(--aqua-600); text-decoration: none; }
-.messages-table .col-email a:hover { text-decoration: underline; }
-.messages-table .col-subject { max-width: 180px; }
-.messages-table .col-message { max-width: 240px; color: var(--slate-600); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.messages-table .col-date { white-space: nowrap; color: var(--slate-500); font-size: 0.8125rem; }
-.pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border-top: 1px solid #e2e8f0; background: #f8fafc; }
-.pagination-info { font-size: 0.875rem; color: var(--slate-600); }
-.pagination-links { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
-.pagination-btn { display: inline-block; padding: 0.4rem 0.75rem; font-size: 0.875rem; font-weight: 600; color: var(--aqua-600); background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; text-decoration: none; font-family: inherit; }
-.pagination-btn:hover:not(.disabled):not(.active) { background: rgba(6, 182, 212, 0.08); border-color: var(--aqua-400); }
-.pagination-btn.active { background: linear-gradient(135deg, var(--aqua-600), var(--aqua-500)); color: white; border-color: transparent; }
-.pagination-btn.disabled { color: var(--slate-400); cursor: default; }
-.pagination-ellipsis { padding: 0 0.25rem; color: var(--slate-400); font-size: 0.875rem; }
-.no-messages { padding: 2rem; color: var(--slate-600); text-align: center; max-width: 400px; }
-.no-messages .back-link { margin-top: 1rem; }
+.msg-reply-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+.msg-reply-modal.open { display: flex; }
+.msg-reply-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+}
+.msg-reply-dialog {
+    position: relative;
+    width: 100%;
+    max-width: 560px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-radius: 20px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
+}
+.msg-reply-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.15rem 1.35rem;
+    border-bottom: 1px solid #e2e8f0;
+    background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+}
+.msg-reply-header h2 {
+    margin: 0;
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: var(--slate-900);
+}
+.msg-reply-close {
+    width: 2rem;
+    height: 2rem;
+    border: none;
+    border-radius: 8px;
+    background: #f1f5f9;
+    color: var(--slate-600);
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.msg-reply-close:hover { background: #e2e8f0; }
+.msg-reply-body {
+    padding: 1.25rem 1.35rem;
+    overflow-y: auto;
+}
+.msg-reply-original {
+    padding: 0.9rem 1rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+}
+.msg-reply-original-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--slate-500);
+    margin-bottom: 0.5rem;
+}
+.msg-reply-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--slate-800);
+    margin-bottom: 0.35rem;
+}
+.msg-reply-original-subject {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--slate-800);
+    margin-bottom: 0.35rem;
+}
+.msg-reply-original-text {
+    font-size: 0.8125rem;
+    color: var(--slate-600);
+    line-height: 1.5;
+    white-space: pre-line;
+}
+.msg-reply-field { margin-bottom: 1rem; }
+.msg-reply-field label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--slate-700);
+}
+.msg-reply-field input,
+.msg-reply-field textarea {
+    width: 100%;
+    padding: 0.75rem 0.95rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    font-size: 0.9375rem;
+    font-family: inherit;
+}
+.msg-reply-field input:focus,
+.msg-reply-field textarea:focus {
+    outline: none;
+    border-color: var(--aqua-500);
+    box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.12);
+}
+.msg-reply-field textarea { resize: vertical; min-height: 120px; }
+.msg-reply-note {
+    font-size: 0.8125rem;
+    color: var(--slate-500);
+    line-height: 1.45;
+    margin: 0;
+}
+.msg-reply-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.65rem;
+    padding: 1rem 1.35rem;
+    border-top: 1px solid #e2e8f0;
+    background: #fafbfc;
+}
 </style>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-document.getElementById('per_page').addEventListener('change', function() {
-    var base = this.dataset.baseUrl;
-    globalThis.location.href = base + '?per_page=' + this.value + '&page=1';
-});
+var perPageEl = document.getElementById('per_page');
+if (perPageEl) {
+    perPageEl.addEventListener('change', function() {
+        globalThis.location.href = this.dataset.baseUrl + '?per_page=' + this.value + '&page=1';
+    });
+}
+
+(function() {
+    var modal = document.getElementById('replyModal');
+    var form = document.getElementById('replyForm');
+    if (!modal || !form) return;
+
+    function openReply(btn) {
+        var subject = btn.dataset.subject || '';
+        document.getElementById('replyToName').textContent = btn.dataset.name || '';
+        document.getElementById('replyToEmail').textContent = btn.dataset.email || '';
+        document.getElementById('replyOriginalSubject').textContent = subject;
+        document.getElementById('replyOriginalMessage').textContent = btn.dataset.message || '';
+        document.getElementById('reply_subject').value = subject.startsWith('Re:') ? subject : 'Re: ' + subject;
+        document.getElementById('reply_body').value = '';
+        form.action = '/admin/messages/' + btn.dataset.id + '/reply';
+        modal.classList.add('open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.getElementById('reply_body').focus();
+    }
+
+    function closeReply() {
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden', 'true');
+    }
+
+    document.querySelectorAll('.msg-reply-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() { openReply(btn); });
+    });
+    document.querySelectorAll('[data-close-reply]').forEach(function(el) {
+        el.addEventListener('click', closeReply);
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal.classList.contains('open')) closeReply();
+    });
+})();
 </script>
 {% endblock %}

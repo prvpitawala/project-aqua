@@ -1,8 +1,20 @@
 {% if total is defined and total > 0 %}
 <nav class="pagination" aria-label="Pagination">
-    <div class="pagination-info">
-        Page {{ page }} of {{ total_pages }}
-        ({{ total }} {{ item_label }}{{ 's' if total != 1 else '' }} total{% if per_page %}, {{ per_page }} per page{% endif %})
+    <div class="pagination-meta">
+        <div class="pagination-info">
+            Page {{ page }} of {{ total_pages }}
+            ({{ total }} {{ item_label }}{{ 's' if total != 1 else '' }} total{% if per_page %}, {{ per_page }} per page{% endif %})
+        </div>
+        {% if per_page_options is defined %}
+        <div class="pagination-per-page">
+            <label for="catalog_per_page">Per page</label>
+            <select id="catalog_per_page" class="pagination-per-page-select" aria-label="Items per page">
+                {% for n in per_page_options %}
+                <option value="{{ n }}" {{ 'selected' if n == per_page else '' }}>{{ n }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
     </div>
     <div class="pagination-links">
         {% if page > 1 %}
@@ -36,4 +48,17 @@
         {% endif %}
     </div>
 </nav>
+<script>
+(function() {
+    var sel = document.getElementById('catalog_per_page');
+    if (!sel) return;
+    sel.addEventListener('change', function() {
+        var params = new URLSearchParams(globalThis.location.search);
+        params.set('per_page', this.value);
+        params.set('page', '1');
+        var qs = params.toString();
+        globalThis.location.search = qs ? '?' + qs : '';
+    });
+})();
+</script>
 {% endif %}

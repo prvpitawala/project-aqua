@@ -1,0 +1,36 @@
+<nav class="admin-pagination" aria-label="{{ pagination_aria_label|default('Pagination') }}">
+    <div class="admin-pagination-info">
+        Page {{ page }} of {{ total_pages }} · {{ total }} {{ item_label|default('items') }} · {{ per_page }} per page
+    </div>
+    <div class="admin-pagination-links">
+        {% if page > 1 %}
+        <a href="{{ url_for(pagination_endpoint, page=page - 1) }}" class="admin-page-btn">Prev</a>
+        {% else %}
+        <span class="admin-page-btn disabled">Prev</span>
+        {% endif %}
+        {% if total_pages > 1 %}
+        {% set start = [1, page - 2]|max %}
+        {% set end = [total_pages, page + 2]|min %}
+        {% if start > 1 %}
+        <a href="{{ url_for(pagination_endpoint, page=1) }}" class="admin-page-btn">1</a>
+        {% if start > 2 %}<span class="admin-page-ellipsis">…</span>{% endif %}
+        {% endif %}
+        {% for p in range(start, end + 1) %}
+        {% if p == page %}
+        <span class="admin-page-btn active">{{ p }}</span>
+        {% else %}
+        <a href="{{ url_for(pagination_endpoint, page=p) }}" class="admin-page-btn">{{ p }}</a>
+        {% endif %}
+        {% endfor %}
+        {% if end < total_pages %}
+        {% if end < total_pages - 1 %}<span class="admin-page-ellipsis">…</span>{% endif %}
+        <a href="{{ url_for(pagination_endpoint, page=total_pages) }}" class="admin-page-btn">{{ total_pages }}</a>
+        {% endif %}
+        {% endif %}
+        {% if page < total_pages %}
+        <a href="{{ url_for(pagination_endpoint, page=page + 1) }}" class="admin-page-btn">Next</a>
+        {% else %}
+        <span class="admin-page-btn disabled">Next</span>
+        {% endif %}
+    </div>
+</nav>

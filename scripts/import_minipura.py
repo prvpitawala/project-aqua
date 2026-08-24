@@ -325,7 +325,7 @@ def pick_weight(product: dict) -> str | None:
 
 def reset_tables(cur) -> None:
     cur.execute("SET FOREIGN_KEY_CHECKS = 0")
-    for table in ("contact_messages", "plants", "tools", "foods", "admins", "delivery_base_per_kg"):
+    for table in ("order_items", "orders", "contact_messages", "plants", "tools", "foods", "admins", "delivery_base_per_kg"):
         cur.execute(f"TRUNCATE TABLE {table}")
     cur.execute("SET FOREIGN_KEY_CHECKS = 1")
 

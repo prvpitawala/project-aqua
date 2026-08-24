@@ -7,6 +7,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+    try {
+        if (sessionStorage.getItem('aqua_cart_open') === '1') {
+            document.documentElement.classList.add('cart-restored-open');
+        }
+    } catch (e) { /* ignore */ }
+    </script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
@@ -19,6 +26,12 @@
             --slate-700: #334155;
             --slate-800: #1e293b;
             --slate-900: #0f172a;
+        }
+        html {
+            scrollbar-gutter: stable;
+        }
+        @supports not (scrollbar-gutter: stable) {
+            html { overflow-y: scroll; }
         }
         body {
             font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
@@ -97,6 +110,7 @@
             background: linear-gradient(135deg, #0e7490, var(--aqua-600)) !important;
         }
         .navbar-cart-btn {
+            position: relative;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -110,6 +124,25 @@
             cursor: pointer;
             transition: color 0.2s, background 0.2s;
         }
+        .cart-badge {
+            position: absolute;
+            top: 0;
+            right: 0;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, var(--aqua-600), var(--aqua-500));
+            color: #fff;
+            font-size: 0.625rem;
+            font-weight: 700;
+            line-height: 18px;
+            text-align: center;
+            border: 2px solid #fff;
+            pointer-events: none;
+        }
+        .cart-badge:empty,
+        .cart-badge[data-count="0"] { display: none; }
         .navbar-cart-btn:hover {
             color: var(--aqua-600);
             background: rgba(6, 182, 212, 0.1);
@@ -331,7 +364,8 @@
             pointer-events: none;
             transition: opacity 0.3s ease;
         }
-        .cart-overlay.show { opacity: 1; pointer-events: auto; }
+        .cart-overlay.show { opacity: 1; }
+        html.cart-restored-open .cart-overlay { opacity: 1; transition: none; }
         .cart-drawer {
             position: fixed;
             top: 0;
@@ -348,6 +382,9 @@
             transition: transform 0.3s ease;
         }
         .cart-drawer.open { transform: translateX(0); }
+        html.cart-restored-open .cart-drawer { transform: translateX(0); transition: none; }
+        .cart-drawer.no-transition,
+        .cart-overlay.no-transition { transition: none !important; }
         .cart-drawer-header {
             display: flex;
             align-items: center;
@@ -439,8 +476,70 @@
         .cart-total { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 1.0625rem; color: var(--slate-900); margin: 0.75rem 0; padding-top: 0.5rem; border-top: 1px solid #e2e8f0; }
         .cart-total span:last-child { color: var(--aqua-600); }
         .cart-drawer-footer .btn-signin { border: none; }
+        .cart-footer-actions { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem; }
+        .cart-btn-secondary {
+            width: 100%;
+            padding: 0.75rem;
+            background: #fff;
+            color: var(--slate-700);
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 0.9375rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .cart-btn-secondary:hover { background: #f8fafc; }
+        .cart-btn-clear {
+            width: 100%;
+            padding: 0.65rem;
+            background: transparent;
+            color: #b91c1c;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .cart-btn-clear:hover { background: #fef2f2; }
+        .cart-added-toast {
+            position: fixed;
+            bottom: 1.25rem;
+            left: 50%;
+            transform: translateX(-50%) translateY(120%);
+            background: var(--slate-900);
+            color: #fff;
+            padding: 0.65rem 1rem;
+            border-radius: 10px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            z-index: 1100;
+            opacity: 0;
+            transition: transform 0.25s ease, opacity 0.25s ease;
+            pointer-events: none;
+        }
+        .cart-added-toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
         .pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1.5rem; padding: 1rem 1.25rem; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; }
+        .pagination-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
         .pagination-info { font-size: 0.875rem; color: var(--slate-600); }
+        .pagination-per-page { display: flex; align-items: center; gap: 0.5rem; }
+        .pagination-per-page label { font-size: 0.8125rem; font-weight: 600; color: var(--slate-600); }
+        .pagination-per-page-select {
+            padding: 0.35rem 0.65rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-family: inherit;
+            font-weight: 600;
+            color: var(--slate-800);
+            background: #fff;
+            cursor: pointer;
+        }
+        .pagination-per-page-select:focus { outline: none; border-color: var(--aqua-500); box-shadow: 0 0 0 3px var(--aqua-600-15); }
         .pagination-links { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
         .pagination-btn { display: inline-block; padding: 0.4rem 0.75rem; font-size: 0.875rem; font-weight: 600; color: var(--aqua-600); background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; text-decoration: none; font-family: inherit; }
         .pagination-btn:hover:not(.disabled):not(.active) { background: rgba(6, 182, 212, 0.08); border-color: var(--aqua-400); }
@@ -470,6 +569,7 @@
             <a href="/" class="navbar-home-link">Home Page</a>
             {% endif %}
             <button type="button" class="navbar-cart-btn" onclick="AquaCart.open()" aria-label="Open cart">
+            <span id="cartBadge" class="cart-badge" data-count="0" aria-hidden="true"></span>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 2a1 1 0 0 0-.9.6L2.2 9.4A1 1 0 0 0 3 11h1.4l1.8 9.2a1 1 0 0 0 1 .8h9.6a1 1 0 0 0 1-.8L18.6 11H21a1 1 0 0 0 .8-1.6L18.9 2.6A1 1 0 0 0 18 2H6zm3.2 9h5.6l-1.2 6H10.4L9.2 11z"/></svg>
             </button>
         </div>
@@ -517,23 +617,28 @@
         </div>
     </div>
 
-    <div id="cartOverlay" class="cart-overlay"></div>
-    <div id="cartDrawer" class="cart-drawer">
+    <div id="cartOverlay" class="cart-overlay" aria-hidden="true"></div>
+    <div id="cartDrawer" class="cart-drawer" role="dialog" aria-modal="true" aria-labelledby="cartDrawerTitle" aria-hidden="true">
         <div class="cart-drawer-header">
-            <h3>Cart</h3>
-            <button type="button" class="cart-drawer-close" onclick="AquaCart.close()" aria-label="Close">×</button>
+            <h3 id="cartDrawerTitle">Your cart</h3>
+            <button type="button" class="cart-drawer-close" onclick="AquaCart.close()" aria-label="Close cart">×</button>
         </div>
         <div id="cartDrawerBody" class="cart-drawer-body">
-            <div id="cartEmpty" class="cart-empty">Your cart is empty</div>
+            <div id="cartEmpty" class="cart-empty">Your cart is empty.<br><span style="font-size:0.875rem;color:var(--slate-500);">Browse plants, tools, or foods to get started.</span></div>
             <div id="cartItemsList" style="display:none;"></div>
         </div>
         <div id="cartDrawerFooter" class="cart-drawer-footer" style="display:none;">
             <div class="cart-summary-row"><span>Subtotal</span><span id="cartSubtotalAmount">LKR 0.00</span></div>
-            <div class="cart-summary-row"><span>Delivery</span><span id="cartDeliveryAmount">LKR 0.00</span></div>
+            <div class="cart-summary-row"><span>Delivery (est.)</span><span id="cartDeliveryAmount">LKR 0.00</span></div>
             <div class="cart-total"><span>Total</span><span id="cartTotalAmount">LKR 0.00</span></div>
-            <button type="button" class="btn-signin" style="width:100%;padding:0.75rem;" onclick="AquaCart.close()">Continue shopping</button>
+            <div class="cart-footer-actions">
+                <a href="{{ url_for('checkout') }}" class="btn-signin" style="width:100%;padding:0.75rem;text-align:center;text-decoration:none;display:block;box-sizing:border-box;">Place order</a>
+                <button type="button" class="cart-btn-secondary" onclick="AquaCart.close()">Continue shopping</button>
+                <button type="button" class="cart-btn-clear" onclick="AquaCart.clear()">Clear cart</button>
+            </div>
         </div>
     </div>
+    <div id="cartAddedToast" class="cart-added-toast" aria-live="polite"></div>
 
     <script>
     function toggleChatPanel(){var p=document.getElementById('chatPanel');var o=document.getElementById('chatOverlay');var open=p.classList.contains('open');if(open){p.classList.remove('open');o.classList.remove('show');}else{p.classList.add('open');o.classList.add('show');document.getElementById('chatInput').focus();}}
@@ -547,23 +652,92 @@
     function submitAdminLogin(e){e.preventDefault();var f=e.target,d=new FormData(f);fetch('/admin/login',{method:'POST',body:d,headers:{'X-Requested-With':'XMLHttpRequest'}}).then(function(r){return r.json();}).then(function(data){if(data.success)globalThis.location.href=data.redirect||'/admin';else{var err=document.getElementById('loginError');err.textContent=data.error||'Invalid credentials';err.style.display='block';}}).catch(function(){document.getElementById('loginError').textContent='An error occurred';document.getElementById('loginError').style.display='block';});}
 
     (function(){
+        var STORAGE_KEY = 'aqua_cart_v1';
+        var OPEN_STORAGE_KEY = 'aqua_cart_open';
         var cart = [];
         var deliveryRule = null;
-        function getDeliveryRule(cb){
-            if (deliveryRule) { cb(deliveryRule); return; }
-            fetch('/api/delivery-rule').then(function(r){ return r.json(); }).then(function(data){ deliveryRule = data; cb(data); }).catch(function(){ cb({ base_price: 450, extra_per_kg: 100 }); });
+        var isOpen = false;
+        var toastTimer = null;
+
+        function parseWeightKg(value) {
+            if (value === undefined || value === null || value === '') return 0;
+            if (typeof value === 'number' && !Number.isNaN(value)) return value;
+            var s = String(value).trim().toLowerCase();
+            var match = s.match(/([\d.]+)\s*(kg|g|lb|lbs)?/);
+            if (!match) return Number.parseFloat(s) || 0;
+            var amount = Number.parseFloat(match[1]);
+            if (Number.isNaN(amount)) return 0;
+            if (match[2] === 'g') return amount / 1000;
+            if (match[2] === 'lb' || match[2] === 'lbs') return amount * 0.453592;
+            return amount;
         }
-        function render(){
+
+        function loadCart() {
+            try {
+                var raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) return [];
+                var parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveCart() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(cart));
+            } catch (e) { /* ignore quota errors */ }
+        }
+
+        function escapeHtml(s) {
+            var d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        function cartCount() {
+            return cart.reduce(function(sum, item) { return sum + item.quantity; }, 0);
+        }
+
+        function updateBadge() {
+            var badge = document.getElementById('cartBadge');
+            if (!badge) return;
+            var count = cartCount();
+            badge.textContent = count > 99 ? '99+' : String(count);
+            badge.setAttribute('data-count', String(count));
+            badge.setAttribute('aria-hidden', count === 0 ? 'true' : 'false');
+        }
+
+        function updateHeader() {
+            var title = document.getElementById('cartDrawerTitle');
+            if (!title) return;
+            var count = cartCount();
+            title.textContent = count ? 'Your cart (' + count + ')' : 'Your cart';
+        }
+
+        function getDeliveryRule(cb) {
+            if (deliveryRule) { cb(deliveryRule); return; }
+            fetch('/api/delivery-rule')
+                .then(function(r) { return r.json(); })
+                .then(function(data) { deliveryRule = data; cb(data); })
+                .catch(function() { cb({ base_price: 450, extra_per_kg: 100 }); });
+        }
+
+        function render() {
             var list = document.getElementById('cartItemsList');
             var empty = document.getElementById('cartEmpty');
             var footer = document.getElementById('cartDrawerFooter');
             var subtotalEl = document.getElementById('cartSubtotalAmount');
             var deliveryEl = document.getElementById('cartDeliveryAmount');
             var totalEl = document.getElementById('cartTotalAmount');
+            updateBadge();
+            updateHeader();
+            if (!list || !empty || !footer) return;
             if (cart.length === 0) {
                 list.style.display = 'none';
                 empty.style.display = 'block';
                 footer.style.display = 'none';
+                list.innerHTML = '';
                 return;
             }
             empty.style.display = 'none';
@@ -571,41 +745,181 @@
             footer.style.display = 'block';
             var subtotal = 0;
             var totalWeight = 0;
-            list.innerHTML = cart.map(function(item, i){
+            list.innerHTML = cart.map(function(item, i) {
                 var line = item.price * item.quantity;
                 subtotal += line;
-                var w = (Number.parseFloat(item.weight) || 0) * item.quantity;
-                totalWeight += w;
-                var img = item.image ? '<img class="cart-item-img" src="' + item.image + '" alt="">' : '<div class="cart-item-img" style="background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:0.75rem;color:#94a3b8;">—</div>';
-                return '<div class="cart-item" data-index="' + i + '">' + img + '<div class="cart-item-info"><div class="cart-item-name">' + escapeHtml(item.name) + '</div><div class="cart-item-qty"><button type="button" onclick="AquaCart.minus(' + i + ')">−</button><span>' + item.quantity + '</span><button type="button" onclick="AquaCart.plus(' + i + ')">+</button></div></div><div class="cart-item-price">LKR ' + line.toFixed(2) + '</div><button type="button" class="cart-item-remove" onclick="AquaCart.remove(' + i + ')" aria-label="Remove">×</button></div>';
+                totalWeight += (item.weightKg || 0) * item.quantity;
+                var img = item.image
+                    ? '<img class="cart-item-img" src="' + escapeHtml(item.image) + '" alt="">'
+                    : '<div class="cart-item-img" style="background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:0.75rem;color:#94a3b8;">—</div>';
+                return '<div class="cart-item" data-index="' + i + '">' + img +
+                    '<div class="cart-item-info"><div class="cart-item-name">' + escapeHtml(item.name) + '</div>' +
+                    '<div class="cart-item-qty"><button type="button" aria-label="Decrease quantity" onclick="AquaCart.minus(' + i + ')">−</button>' +
+                    '<span>' + item.quantity + '</span>' +
+                    '<button type="button" aria-label="Increase quantity" onclick="AquaCart.plus(' + i + ')">+</button></div></div>' +
+                    '<div class="cart-item-price">LKR ' + line.toFixed(2) + '</div>' +
+                    '<button type="button" class="cart-item-remove" onclick="AquaCart.remove(' + i + ')" aria-label="Remove item">×</button></div>';
             }).join('');
             subtotalEl.textContent = 'LKR ' + subtotal.toFixed(2);
-            getDeliveryRule(function(rule){
-                var delivery = rule.base_price + (totalWeight * rule.extra_per_kg);
+            getDeliveryRule(function(rule) {
+                var delivery = Number(rule.base_price || 0) + (totalWeight * Number(rule.extra_per_kg || 0));
                 deliveryEl.textContent = 'LKR ' + delivery.toFixed(2);
                 totalEl.textContent = 'LKR ' + (subtotal + delivery).toFixed(2);
             });
         }
-        function escapeHtml(s){ var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+        function setOpen(open, animate) {
+            isOpen = open;
+            try {
+                if (open) sessionStorage.setItem(OPEN_STORAGE_KEY, '1');
+                else sessionStorage.removeItem(OPEN_STORAGE_KEY);
+            } catch (e) { /* ignore */ }
+            var drawer = document.getElementById('cartDrawer');
+            var overlay = document.getElementById('cartOverlay');
+            if (!drawer || !overlay) return;
+            var useAnimation = animate !== false;
+            if (!useAnimation) {
+                drawer.classList.add('no-transition');
+                overlay.classList.add('no-transition');
+            }
+            drawer.classList.toggle('open', open);
+            overlay.classList.toggle('show', open);
+            drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
+            overlay.setAttribute('aria-hidden', open ? 'false' : 'true');
+            document.documentElement.classList.remove('cart-restored-open');
+            if (!useAnimation) {
+                requestAnimationFrame(function() {
+                    drawer.classList.remove('no-transition');
+                    overlay.classList.remove('no-transition');
+                });
+            }
+        }
+
+        function wasCartOpen() {
+            try {
+                return sessionStorage.getItem(OPEN_STORAGE_KEY) === '1';
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function showToast(message) {
+            var toast = document.getElementById('cartAddedToast');
+            if (!toast) return;
+            toast.textContent = message;
+            toast.classList.add('show');
+            if (toastTimer) clearTimeout(toastTimer);
+            toastTimer = setTimeout(function() { toast.classList.remove('show'); }, 2200);
+        }
+
+        function findItemIndex(id, type) {
+            return cart.findIndex(function(x) { return String(x.id) === String(id) && x.type === type; });
+        }
+
+        function readButton(el) {
+            return {
+                id: el.dataset.id,
+                type: el.dataset.type || 'product',
+                name: el.dataset.name || '',
+                price: Number.parseFloat(el.dataset.price),
+                image: el.dataset.image || '',
+                weightKg: parseWeightKg(el.dataset.weight),
+            };
+        }
+
+        cart = loadCart();
+
         globalThis.AquaCart = {
-            add: function(name, price, image, weight){
-                image = image || '';
-                weight = weight !== undefined && weight !== '' ? Number.parseFloat(weight) : 0;
-                if (Number.isNaN(weight)) weight = 0;
-                var item = cart.find(function(x){ return x.name === name && x.price === price; });
-                if (item) { item.quantity += 1; if (weight) item.weight = weight; }
-                else cart.push({ name: name, price: price, image: image, quantity: 1, weight: weight });
+            add: function(id, type, name, price, image, weight) {
+                if (!name) return;
+                var priceNum = Number.parseFloat(price);
+                if (Number.isNaN(priceNum)) priceNum = 0;
+                var weightKg = parseWeightKg(weight);
+                var idx = findItemIndex(id, type);
+                if (idx >= 0) {
+                    cart[idx].quantity += 1;
+                    if (image) cart[idx].image = image;
+                    if (weightKg) cart[idx].weightKg = weightKg;
+                } else {
+                    cart.push({
+                        id: id,
+                        type: type,
+                        name: name,
+                        price: priceNum,
+                        image: image || '',
+                        weightKg: weightKg,
+                        quantity: 1,
+                    });
+                }
+                saveCart();
                 render();
-                document.getElementById('cartDrawer').classList.add('open');
-                document.getElementById('cartOverlay').classList.add('show');
+                setOpen(true);
+                showToast('Added to cart');
             },
-            open: function(){ document.getElementById('cartDrawer').classList.add('open'); document.getElementById('cartOverlay').classList.add('show'); render(); },
-            close: function(){ document.getElementById('cartDrawer').classList.remove('open'); document.getElementById('cartOverlay').classList.remove('show'); },
-            plus: function(i){ if (cart[i]) { cart[i].quantity += 1; render(); } },
-            minus: function(i){ if (cart[i]) { cart[i].quantity -= 1; if (cart[i].quantity <= 0) { cart.splice(i, 1); } render(); } },
-            remove: function(i){ if (cart[i]) { cart.splice(i, 1); render(); } }
+            addFromButton: function(btn) {
+                if (!btn || btn.classList.contains('btn-add-cart-disabled') || btn.classList.contains('btn-add-detail-disabled')) return;
+                var data = readButton(btn);
+                if (!data.name) return;
+                this.add(data.id, data.type, data.name, data.price, data.image, data.weightKg);
+            },
+            open: function() {
+                render();
+                setOpen(true);
+            },
+            close: function() {
+                setOpen(false);
+            },
+            plus: function(i) {
+                if (cart[i]) {
+                    cart[i].quantity += 1;
+                    saveCart();
+                    render();
+                }
+            },
+            minus: function(i) {
+                if (!cart[i]) return;
+                cart[i].quantity -= 1;
+                if (cart[i].quantity <= 0) cart.splice(i, 1);
+                saveCart();
+                render();
+            },
+            remove: function(i) {
+                if (cart[i]) {
+                    cart.splice(i, 1);
+                    saveCart();
+                    render();
+                }
+            },
+            clear: function() {
+                if (!cart.length) return;
+                if (!globalThis.confirm('Remove all items from your cart?')) return;
+                cart = [];
+                saveCart();
+                render();
+            },
         };
-        document.getElementById('cartOverlay').addEventListener('click', function(){ AquaCart.close(); });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && isOpen) AquaCart.close();
+        });
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.btn-add-cart, .btn-add-detail');
+            if (!btn) return;
+            if (btn.classList.contains('btn-add-cart-disabled') || btn.classList.contains('btn-add-detail-disabled')) return;
+            e.preventDefault();
+            e.stopPropagation();
+            AquaCart.addFromButton(btn);
+        });
+
+        render();
+        if (wasCartOpen()) {
+            setOpen(true, false);
+        }
+        globalThis.addEventListener('pageshow', function(e) {
+            if (e.persisted && wasCartOpen()) {
+                setOpen(true, false);
+            }
+        });
     })();
     </script>
     {% block extra_js %}{% endblock %}
