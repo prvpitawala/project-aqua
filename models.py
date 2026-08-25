@@ -457,6 +457,121 @@ def save_contact_message(name, email, subject, message):
         return (None, str(e))
 
 
+def ensure_product_files_table():
+    """Create product_files table if it does not exist yet."""
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                '''
+                CREATE TABLE IF NOT EXISTS product_files (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    product_type VARCHAR(20) NOT NULL,
+                    product_id INT NOT NULL,
+                    file_name VARCHAR(255) NOT NULL,
+                    file_type VARCHAR(100) DEFAULT NULL,
+                    file_size INT NOT NULL DEFAULT 0,
+                    file_data LONGBLOB NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_product (product_type, product_id)
+                )
+                '''
+            )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
+def get_product_files(product_type, product_id):
+    """Return metadata for files attached to a catalog product (no blob data)."""
+    ensure_product_files_table()
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                '''
+                SELECT id, file_name, file_type, file_size, created_at
+                FROM product_files
+                WHERE product_type = %s AND product_id = %s
+                ORDER BY id ASC
+                ''',
+                (product_type, product_id),
+            )
+            rows = cur.fetchall()
+        conn.close()
+        return rows
+    except Exception:
+        return []
+
+
+def get_product_file_by_id(file_id):
+    """Return a single file record including blob data, or None."""
+    ensure_product_files_table()
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                '''
+                SELECT id, product_type, product_id, file_name, file_type, file_size, file_data
+                FROM product_files
+                WHERE id = %s
+                ''',
+                (file_id,),
+            )
+            row = cur.fetchone()
+        conn.close()
+        return row
+    except Exception:
+        return None
+
+
+def add_product_file(product_type, product_id, file_name, file_data, file_type, file_size):
+    """Attach a document to a catalog product. Returns new file id or None."""
+    ensure_product_files_table()
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                '''
+                INSERT INTO product_files (product_type, product_id, file_name, file_type, file_size, file_data)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ''',
+                (product_type, product_id, file_name, file_type, file_size, file_data),
+            )
+            new_id = cur.lastrowid
+        conn.commit()
+        conn.close()
+        return new_id
+    except Exception:
+        return None
+
+
+def delete_product_files(product_type, product_id, file_ids):
+    """Delete files that belong to the given product. Returns number deleted."""
+    if not file_ids:
+        return 0
+    ensure_product_files_table()
+    placeholders = ','.join(['%s'] * len(file_ids))
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                f'''
+                DELETE FROM product_files
+                WHERE product_type = %s AND product_id = %s AND id IN ({placeholders})
+                ''',
+                (product_type, product_id, *file_ids),
+            )
+            deleted = cur.rowcount
+        conn.commit()
+        conn.close()
+        return deleted
+    except Exception:
+        return 0
+
+
 def ensure_orders_tables():
     """Create orders tables if they do not exist yet."""
     try:
@@ -609,6 +724,7 @@ def create_order(customer_name, customer_email, customer_phone, delivery_address
 def get_orders_paginated(page=1, per_page=15):
     """Fetch one page of orders. Returns (orders, total, total_pages, current_page)."""
     ensure_orders_tables()
+    normalize_order_statuses()
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
@@ -640,6 +756,7 @@ def get_orders_paginated(page=1, per_page=15):
 def get_order_by_id(order_id):
     """Fetch a single order with its line items."""
     ensure_orders_tables()
+    normalize_order_statuses()
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
@@ -673,9 +790,51 @@ def get_order_by_id(order_id):
         return None
 
 
+ORDER_STATUSES = ('pending', 'completed')
+
+
+def normalize_order_statuses():
+    """Map legacy order statuses to pending or completed only."""
+    ensure_orders_tables()
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE orders SET status = 'completed' WHERE status IN ('completed', 'confirmed')"
+            )
+            cur.execute(
+                "UPDATE orders SET status = 'pending' WHERE status IS NULL OR status NOT IN ('pending', 'completed')"
+            )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
+def get_order_status_counts():
+    """Return total counts for pending and completed orders."""
+    normalize_order_statuses()
+    counts = {'pending': 0, 'completed': 0, 'total': 0}
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute('SELECT COUNT(*) AS n FROM orders')
+            counts['total'] = int(cur.fetchone()['n'])
+            cur.execute(
+                "SELECT status, COUNT(*) AS n FROM orders WHERE status IN ('pending', 'completed') GROUP BY status"
+            )
+            for row in cur.fetchall():
+                counts[row['status']] = int(row['n'])
+        conn.close()
+    except Exception:
+        pass
+    return counts
+
+
 def update_order_status(order_id, status):
     """Update order status. Returns True on success."""
-    allowed = {'pending', 'completed', 'cancelled'}
+    allowed = set(ORDER_STATUSES)
     status = (status or '').strip().lower()
     if status not in allowed:
         return False

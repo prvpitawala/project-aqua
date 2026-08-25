@@ -10,7 +10,152 @@ document.addEventListener('DOMContentLoaded', function() {
             prev.innerHTML = '<img src="' + URL.createObjectURL(f) + '" alt="Preview"><span class="image-preview-label">New</span>';
         });
     });
+
+    var fileInput = document.getElementById('catalogFileInput');
+    var fileDrop = document.getElementById('catalogFileDrop');
+    var fileList = document.getElementById('catalogFileList');
+    var deleteInputs = document.getElementById('catalogFileDeleteInputs');
+    var catalogForm = fileInput ? fileInput.closest('form') : null;
+    if (!fileInput || !fileDrop || !fileList || !catalogForm) return;
+
+    var pendingFiles = [];
+    var allowedExt = ['.txt', '.csv', '.md', '.pdf', '.doc', '.docx'];
+
+    function isAllowedFile(file) {
+        if (!file || !file.name) return false;
+        var name = file.name.toLowerCase();
+        for (var i = 0; i < allowedExt.length; i++) {
+            if (name.endsWith(allowedExt[i])) return true;
+        }
+        if (file.type && file.type.indexOf('text/') === 0) return true;
+        return false;
+    }
+
+    function formatSize(bytes) {
+        if (!bytes) return '0 B';
+        var units = ['B', 'KB', 'MB', 'GB'];
+        var i = 0;
+        var size = bytes;
+        while (size >= 1024 && i < units.length - 1) {
+            size /= 1024;
+            i++;
+        }
+        return (i === 0 ? size : size.toFixed(1)) + ' ' + units[i];
+    }
+
+    function syncFileInput() {
+        var dt = new DataTransfer();
+        pendingFiles.forEach(function(file) { dt.items.add(file); });
+        fileInput.files = dt.files;
+    }
+
+    function updateListVisibility() {
+        var hasItems = fileList.querySelectorAll('.catalog-file-item:not([hidden])').length > 0;
+        fileList.classList.toggle('catalog-file-list--empty', !hasItems);
+    }
+
+    function addPendingFile(file) {
+        if (!isAllowedFile(file)) return;
+        var key = file.name + ':' + file.size + ':' + file.lastModified;
+        var exists = pendingFiles.some(function(f) {
+            return (f.name + ':' + f.size + ':' + f.lastModified) === key;
+        });
+        if (exists) return;
+
+        pendingFiles.push(file);
+        syncFileInput();
+
+        var li = document.createElement('li');
+        li.className = 'catalog-file-item catalog-file-item--pending';
+        li.dataset.pendingKey = key;
+        li.innerHTML =
+            '<span class="catalog-file-icon" aria-hidden="true">' +
+                '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+                    '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>' +
+                    '<polyline points="14 2 14 8 20 8"/>' +
+                '</svg>' +
+            '</span>' +
+            '<div class="catalog-file-meta">' +
+                '<span class="catalog-file-name">' + file.name + '</span>' +
+                '<span class="catalog-file-size">' + formatSize(file.size) + ' · New</span>' +
+            '</div>' +
+            '<button type="button" class="catalog-file-remove" aria-label="Remove ' + file.name + '">Remove</button>';
+        fileList.appendChild(li);
+        updateListVisibility();
+    }
+
+    function addPendingFiles(fileListLike) {
+        Array.prototype.forEach.call(fileListLike || [], function(file) {
+            addPendingFile(file);
+        });
+    }
+
+    fileDrop.addEventListener('click', function() { fileInput.click(); });
+    fileDrop.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            fileInput.click();
+        }
+    });
+
+    fileInput.addEventListener('change', function() {
+        addPendingFiles(this.files);
+        syncFileInput();
+    });
+
+    ['dragenter', 'dragover'].forEach(function(evt) {
+        fileDrop.addEventListener(evt, function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            fileDrop.classList.add('catalog-file-drop--active');
+        });
+    });
+    ['dragleave', 'drop'].forEach(function(evt) {
+        fileDrop.addEventListener(evt, function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            fileDrop.classList.remove('catalog-file-drop--active');
+        });
+    });
+    fileDrop.addEventListener('drop', function(e) {
+        addPendingFiles(e.dataTransfer && e.dataTransfer.files);
+        syncFileInput();
+    });
+
+    fileList.addEventListener('click', function(e) {
+        var btn = e.target.closest('.catalog-file-remove');
+        if (!btn) return;
+
+        var existingId = btn.getAttribute('data-existing-id');
+        if (existingId) {
+            var li = btn.closest('.catalog-file-item');
+            if (!li || li.hidden) return;
+            var hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = 'delete_file_ids[]';
+            hidden.value = existingId;
+            deleteInputs.appendChild(hidden);
+            li.hidden = true;
+            updateListVisibility();
+            return;
+        }
+
+        var pendingItem = btn.closest('.catalog-file-item--pending');
+        if (!pendingItem) return;
+        var pendingKey = pendingItem.dataset.pendingKey;
+        pendingFiles = pendingFiles.filter(function(f) {
+            return (f.name + ':' + f.size + ':' + f.lastModified) !== pendingKey;
+        });
+        pendingItem.remove();
+        syncFileInput();
+        updateListVisibility();
+    });
+
+    catalogForm.addEventListener('submit', function() {
+        syncFileInput();
+    });
 });
+
 function handleImageDrop(e, slot) {
     e.preventDefault();
     var f = e.dataTransfer && e.dataTransfer.files[0];

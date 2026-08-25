@@ -114,6 +114,19 @@ CREATE TABLE IF NOT EXISTS order_items (
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 );
 
+-- Text/document attachments for catalog products (plants, tools, foods)
+CREATE TABLE IF NOT EXISTS product_files (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_type VARCHAR(20) NOT NULL,
+    product_id INT NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    file_type VARCHAR(100) DEFAULT NULL,
+    file_size INT NOT NULL DEFAULT 0,
+    file_data LONGBLOB NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_product (product_type, product_id)
+);
+
 -- High-quality images: LONGBLOB supports up to 4 GB per image.
 -- If uploading very large images, increase MySQL max_allowed_packet:
 --   SET GLOBAL max_allowed_packet = 67108864;  -- 64 MB

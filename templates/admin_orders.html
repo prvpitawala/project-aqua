@@ -20,29 +20,33 @@
         </div>
     </div>
 
+    {% if notice %}
+    <div class="admin-alert admin-alert-{{ notice_type or 'success' }}">{{ notice }}</div>
+    {% endif %}
+
     <div class="admin-stat-row">
         <div class="admin-stat-card">
             <div class="admin-stat-icon aqua">🛒</div>
             <div>
                 <div class="admin-stat-label">Total orders</div>
-                <div class="admin-stat-value">{{ total }}</div>
+                <div class="admin-stat-value">{{ status_counts.total }}</div>
                 <div class="admin-stat-hint">All time</div>
             </div>
         </div>
         <div class="admin-stat-card">
             <div class="admin-stat-icon amber">⏳</div>
             <div>
-                <div class="admin-stat-label">On this page</div>
-                <div class="admin-stat-value">{{ orders|selectattr('status', 'equalto', 'pending')|list|length if orders else 0 }}</div>
-                <div class="admin-stat-hint">Pending status</div>
+                <div class="admin-stat-label">Pending</div>
+                <div class="admin-stat-value">{{ status_counts.pending }}</div>
+                <div class="admin-stat-hint">Awaiting fulfillment</div>
             </div>
         </div>
         <div class="admin-stat-card">
-            <div class="admin-stat-icon green">📦</div>
+            <div class="admin-stat-icon green">✓</div>
             <div>
-                <div class="admin-stat-label">Showing</div>
-                <div class="admin-stat-value">{{ orders|length }}</div>
-                <div class="admin-stat-hint">Page {{ page }} of {{ total_pages }}</div>
+                <div class="admin-stat-label">Completed</div>
+                <div class="admin-stat-value">{{ status_counts.completed }}</div>
+                <div class="admin-stat-hint">Delivered or fulfilled</div>
             </div>
         </div>
     </div>
@@ -68,6 +72,7 @@
                 </thead>
                 <tbody>
                     {% for order in orders %}
+                    {% set order_status = 'completed' if order.status == 'completed' else 'pending' %}
                     <tr>
                         <td class="admin-cell-id">#{{ order.id }}</td>
                         <td>
@@ -82,7 +87,24 @@
                         <td class="admin-cell-muted">{{ order.item_count or 0 }} item{{ 's' if (order.item_count or 0) != 1 else '' }}</td>
                         <td class="admin-cell-total">LKR {{ "%.2f"|format(order.total) }}</td>
                         <td>
-                            <span class="admin-badge status-{{ order.status }}">{{ order.status|capitalize }}</span>
+                            <form
+                                method="post"
+                                action="{{ url_for('admin_order_status', order_id=order.id) }}"
+                                class="order-status-inline-form"
+                            >
+                                <input type="hidden" name="return_to" value="list">
+                                <input type="hidden" name="page" value="{{ page }}">
+                                <input type="hidden" name="per_page" value="{{ per_page }}">
+                                <select
+                                    name="status"
+                                    class="order-status-select {{ 'status-completed-select' if order_status == 'completed' else 'status-pending-select' }}"
+                                    onchange="this.form.submit()"
+                                    aria-label="Change status for order {{ order.id }}"
+                                >
+                                    <option value="pending" {{ 'selected' if order_status == 'pending' else '' }}>Pending</option>
+                                    <option value="completed" {{ 'selected' if order_status == 'completed' else '' }}>Completed</option>
+                                </select>
+                            </form>
                         </td>
                         <td class="admin-cell-date">{{ order.created_at.strftime('%b %d, %Y · %H:%M') if order.created_at else '—' }}</td>
                         <td>

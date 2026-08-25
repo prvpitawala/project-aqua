@@ -17,6 +17,17 @@ QUERY_UPDATED = '?updated=1'
 MIME_JPEG = 'image/jpeg'
 CATALOG_PER_PAGE_DEFAULT = 20
 CATALOG_PER_PAGE_OPTIONS = (10, 20, 50)
+CATALOG_TABLE_TYPES = {
+    'plants': 'plant',
+    'tools': 'tool',
+    'foods': 'food',
+}
+ALLOWED_CATALOG_DOC_EXTENSIONS = {'.txt', '.csv', '.md', '.pdf', '.doc', '.docx'}
+ALLOWED_CATALOG_DOC_MIMES = {
+    'text/plain', 'text/csv', 'text/markdown', 'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+}
 
 
 def paginate_list(items, page, per_page=CATALOG_PER_PAGE_DEFAULT):
@@ -472,7 +483,8 @@ def admin_message_reply(message_id):
 @app.route('/admin/orders')
 @admin_required
 def admin_orders():
-    from models import get_orders_paginated
+    from models import get_orders_paginated, get_order_status_counts
+
     page = request.args.get('page', 1, type=int)
     per_page_arg = request.args.get('per_page', type=int)
     if per_page_arg is not None and per_page_arg in PER_PAGE_OPTIONS:
@@ -484,6 +496,15 @@ def admin_orders():
         if per_page not in PER_PAGE_OPTIONS:
             per_page = 15
     orders, total, total_pages, current_page = get_orders_paginated(page, per_page)
+    status_counts = get_order_status_counts()
+    notice = None
+    notice_type = None
+    if request.args.get('updated') == '1':
+        notice = 'Order status updated.'
+        notice_type = 'success'
+    elif request.args.get('error') == 'invalid_status':
+        notice = 'Could not update order status.'
+        notice_type = 'error'
     return render_template(
         'admin_orders.html',
         orders=orders,
@@ -492,13 +513,16 @@ def admin_orders():
         page=current_page,
         per_page=per_page,
         per_page_options=PER_PAGE_OPTIONS,
+        status_counts=status_counts,
+        notice=notice,
+        notice_type=notice_type,
     )
 
 
-@app.route('/admin/orders/<int:order_id>', methods=['GET', 'POST'])
+@app.route('/admin/orders/<int:order_id>', methods=['GET'])
 @admin_required
 def admin_order_detail(order_id):
-    from models import get_order_by_id, update_order_status
+    from models import get_order_by_id
 
     order = get_order_by_id(order_id)
     if not order:
@@ -506,15 +530,12 @@ def admin_order_detail(order_id):
 
     message = None
     message_type = None
-    if request.method == 'POST':
-        status = request.form.get('status', '').strip()
-        if update_order_status(order_id, status):
-            message = 'Order status updated.'
-            message_type = 'success'
-            order = get_order_by_id(order_id)
-        else:
-            message = 'Could not update order status.'
-            message_type = 'error'
+    if request.args.get('updated') == '1':
+        message = 'Order status updated.'
+        message_type = 'success'
+    elif request.args.get('error') == 'invalid_status':
+        message = 'Could not update order status.'
+        message_type = 'error'
 
     return render_template(
         'admin_order_detail.html',
@@ -522,6 +543,30 @@ def admin_order_detail(order_id):
         message=message,
         message_type=message_type,
     )
+
+
+@app.route('/admin/orders/<int:order_id>/status', methods=['POST'])
+@admin_required
+def admin_order_status(order_id):
+    from models import update_order_status
+
+    status = request.form.get('status', '').strip()
+    return_to = request.form.get('return_to', 'list')
+    page = request.form.get('page', 1, type=int)
+    per_page = request.form.get('per_page', type=int)
+
+    if not update_order_status(order_id, status):
+        if return_to == 'detail':
+            return redirect(url_for('admin_order_detail', order_id=order_id, error='invalid_status'))
+        return redirect(url_for('admin_orders', page=page, error='invalid_status'))
+
+    if return_to == 'detail':
+        return redirect(url_for('admin_order_detail', order_id=order_id, updated=1))
+
+    params = {'page': page, 'updated': 1}
+    if per_page:
+        params['per_page'] = per_page
+    return redirect(url_for('admin_orders', **params))
 
 
 def _filter_items_by_stock(items, stock):
@@ -588,6 +633,53 @@ def _parse_catalog_form_fields():
         'co2_condition': request.form.get('co2_condition', '').strip() or None,
         'light_condition': request.form.get('light_condition', '').strip() or None,
     }
+
+
+def _is_allowed_catalog_document(filename, mime_type):
+    ext = os.path.splitext((filename or '').lower())[1]
+    if ext in ALLOWED_CATALOG_DOC_EXTENSIONS:
+        return True
+    if mime_type:
+        if mime_type.startswith('text/'):
+            return True
+        if mime_type in ALLOWED_CATALOG_DOC_MIMES:
+            return True
+    return False
+
+
+def _catalog_files_for(table, item_id=None):
+    if not item_id:
+        return []
+    from models import get_product_files
+    return get_product_files(CATALOG_TABLE_TYPES[table], item_id)
+
+
+def _process_catalog_file_changes(table, item_id):
+    """Apply document uploads and deletions for a catalog product."""
+    from models import add_product_file, delete_product_files
+    from werkzeug.utils import secure_filename
+
+    product_type = CATALOG_TABLE_TYPES[table]
+    delete_ids = []
+    for raw_id in request.form.getlist('delete_file_ids'):
+        try:
+            delete_ids.append(int(raw_id))
+        except (TypeError, ValueError):
+            pass
+    if delete_ids:
+        delete_product_files(product_type, item_id, delete_ids)
+
+    for upload in request.files.getlist('catalog_documents'):
+        if not upload or not upload.filename:
+            continue
+        filename = secure_filename(upload.filename) or 'document.txt'
+        data = upload.read()
+        if not data:
+            continue
+        if not _is_allowed_catalog_document(filename, upload.content_type):
+            continue
+        mime = (upload.content_type or 'application/octet-stream')[:100]
+        add_product_file(product_type, item_id, filename, data, mime, len(data))
 
 
 def _admin_list_flash_message(item_label):
@@ -661,6 +753,7 @@ def _save_plant_form(item_id=None):
             merged['light_condition'] = form_data.get('light_condition') or ''
             return merged, 'Failed to update plant.', 'error'
         _update_item_images('plants', item_id, images)
+        _process_catalog_file_changes('plants', item_id)
         return redirect(url_for('admin_plants') + QUERY_UPDATED)
     new_id, err = add_plant(
         form_data['name'], form_data['price'], form_data['category'], form_data['description'],
@@ -669,6 +762,7 @@ def _save_plant_form(item_id=None):
         light_condition=form_data['light_condition'],
     )
     if new_id:
+        _process_catalog_file_changes('plants', new_id)
         return redirect(url_for('admin_plants') + '?added=1')
     fail_msg = f'Failed to add plant: {err}' if err else 'Failed to add plant. Check database connection.'
     item = dict(_blank_catalog_item(), **form_data)
@@ -692,6 +786,7 @@ def admin_plants_new():
                 form_action=url_for('admin_plants_new'),
                 message=message,
                 message_type=message_type,
+                catalog_files=[],
             )
         return result
     return render_template(
@@ -699,6 +794,7 @@ def admin_plants_new():
         item=_blank_catalog_item(),
         is_edit=False,
         form_action=url_for('admin_plants_new'),
+        catalog_files=[],
     )
 
 
@@ -720,6 +816,7 @@ def admin_plants_edit(id):
                 form_action=url_for('admin_plants_edit', id=id),
                 message=message,
                 message_type=message_type,
+                catalog_files=_catalog_files_for('plants', id),
             )
         return result
     return render_template(
@@ -727,6 +824,7 @@ def admin_plants_edit(id):
         item=plant,
         is_edit=True,
         form_action=url_for('admin_plants_edit', id=id),
+        catalog_files=_catalog_files_for('plants', id),
     )
 
 
@@ -748,12 +846,14 @@ def _save_tool_food_form(table, add_fn, update_fn, list_route, edit_template, it
             merged['id'] = item_id
             return merged, f'Failed to update {table[:-1]}.', 'error'
         _update_item_images(table, item_id, images)
+        _process_catalog_file_changes(table, item_id)
         return redirect(list_route + QUERY_UPDATED)
     new_id, err = add_fn(
         plant_fields['name'], plant_fields['price'], plant_fields['category'], plant_fields['description'],
         img1, t1, img2, t2, img3, t3, plant_fields['weight'], plant_fields['in_stock'],
     )
     if new_id:
+        _process_catalog_file_changes(table, new_id)
         return redirect(list_route + '?added=1')
     fail_msg = f'Failed to add {table[:-1]}: {err}' if err else f'Failed to add {table[:-1]}. Check database connection.'
     return dict(_blank_catalog_item(), **plant_fields), fail_msg, 'error'
@@ -771,6 +871,21 @@ def _read_uploaded_image(field_name):
     if mime not in (MIME_JPEG, 'image/png', 'image/gif', 'image/webp'):
         mime = MIME_JPEG
     return (data, mime[:20])
+
+
+@app.route('/admin/catalog-files/<int:id>')
+@admin_required
+def serve_catalog_file(id):
+    """Download a catalog document attachment."""
+    from models import get_product_file_by_id
+    record = get_product_file_by_id(id)
+    if not record:
+        return '', 404
+    return Response(
+        record['file_data'],
+        mimetype=record['file_type'] or 'application/octet-stream',
+        headers={'Content-Disposition': f'attachment; filename="{record["file_name"]}"'},
+    )
 
 
 @app.route('/admin/plants/<int:id>/image/<int:slot>')
@@ -826,6 +941,7 @@ def admin_tools_new():
                 image_route='serve_tool_image',
                 message=message,
                 message_type=message_type,
+                catalog_files=[],
             )
         return result
     return render_template(
@@ -834,6 +950,7 @@ def admin_tools_new():
         is_edit=False,
         form_action=url_for('admin_tools_new'),
         image_route='serve_tool_image',
+        catalog_files=[],
     )
 
 
@@ -856,6 +973,7 @@ def admin_tools_edit(id):
                 image_route='serve_tool_image',
                 message=message,
                 message_type=message_type,
+                catalog_files=_catalog_files_for('tools', id),
             )
         return result
     return render_template(
@@ -864,6 +982,7 @@ def admin_tools_edit(id):
         is_edit=True,
         form_action=url_for('admin_tools_edit', id=id),
         image_route='serve_tool_image',
+        catalog_files=_catalog_files_for('tools', id),
     )
 
 
@@ -920,6 +1039,7 @@ def admin_foods_new():
                 image_route='serve_food_image',
                 message=message,
                 message_type=message_type,
+                catalog_files=[],
             )
         return result
     return render_template(
@@ -928,6 +1048,7 @@ def admin_foods_new():
         is_edit=False,
         form_action=url_for('admin_foods_new'),
         image_route='serve_food_image',
+        catalog_files=[],
     )
 
 
@@ -950,6 +1071,7 @@ def admin_foods_edit(id):
                 image_route='serve_food_image',
                 message=message,
                 message_type=message_type,
+                catalog_files=_catalog_files_for('foods', id),
             )
         return result
     return render_template(
@@ -958,6 +1080,7 @@ def admin_foods_edit(id):
         is_edit=True,
         form_action=url_for('admin_foods_edit', id=id),
         image_route='serve_food_image',
+        catalog_files=_catalog_files_for('foods', id),
     )
 
 

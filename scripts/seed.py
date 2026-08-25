@@ -146,6 +146,7 @@ def reset_tables(cur) -> None:
     for table in (
         "order_items",
         "orders",
+        "product_files",
         "contact_messages",
         "plants",
         "tools",
@@ -329,7 +330,7 @@ def seed_orders(cur) -> None:
             "customer_phone": None,
             "delivery_address": "12 Hill Street, Nuwara Eliya",
             "notes": "Email invoice only.",
-            "status": "cancelled",
+            "status": "pending",
             "days_ago": 12,
             "lines": [("plant", 1, 1), ("tool", 1, 1)],
         },
