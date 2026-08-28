@@ -30,8 +30,16 @@
 .product-info-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.5rem; }
 .product-price { font-size: 1rem; font-weight: 700; color: var(--aqua-600); margin: 0; }
 .product-category { font-size: 0.75rem; color: var(--slate-500); margin-top: 0.25rem; }
-.btn-edit { padding: 0.35rem 0.65rem; font-size: 0.75rem; font-weight: 600; color: var(--aqua-600); background: rgba(6, 182, 212, 0.1); border: 1px solid var(--aqua-400); border-radius: 8px; text-decoration: none; display: inline-block; }
+.btn-edit, .btn-delete {
+    padding: 0.35rem 0.65rem; min-width: 4.75rem; font-size: 0.75rem; font-weight: 600; font-family: inherit; line-height: 1.2;
+    border-radius: 8px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; text-align: center;
+}
+.btn-edit { color: var(--aqua-600); background: rgba(6, 182, 212, 0.1); border: 1px solid var(--aqua-400); text-decoration: none; }
 .btn-edit:hover { background: rgba(6, 182, 212, 0.2); }
+.btn-delete { color: #b91c1c; background: rgba(185, 28, 28, 0.1); border: 1px solid #f87171; cursor: pointer; margin: 0; }
+.btn-delete:hover { background: rgba(185, 28, 28, 0.2); }
+.product-card-actions { display: flex; align-items: center; gap: 0.35rem; }
+.delete-form { margin: 0; display: inline; }
 .add-new-card {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     min-height: 220px; cursor: pointer; border: 2px dashed var(--aqua-400);
@@ -131,7 +139,12 @@
                 </a>
                 <div class="product-card-footer">
                     <span class="product-price">LKR {{ "%.2f"|format(item.price) }}</span>
-                    <a href="{{ url_for('admin_tools_edit', id=item.id) }}" class="btn-edit">Edit</a>
+                    <div class="product-card-actions">
+                        <a href="{{ url_for('admin_tools_edit', id=item.id) }}" class="btn-edit">Edit</a>
+                        <form method="post" action="{{ url_for('admin_tools_delete', id=item.id) }}" class="delete-form" onsubmit="return confirm('Delete this tool? This cannot be undone.');">
+                            <button type="submit" class="btn-delete">Delete</button>
+                        </form>
+                    </div>
                 </div>
             </div>
             {% endfor %}

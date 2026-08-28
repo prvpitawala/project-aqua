@@ -687,7 +687,22 @@ def _admin_list_flash_message(item_label):
         return f'{item_label} updated successfully.', 'success'
     if request.args.get('added'):
         return f'{item_label} added successfully.', 'success'
+    if request.args.get('deleted'):
+        return f'{item_label} deleted successfully.', 'success'
+    if request.args.get('error') == 'delete_failed':
+        return f'Failed to delete {item_label.lower()}.', 'error'
     return None, 'success'
+
+
+def _admin_delete_product(table, item_id, get_by_id, list_route):
+    """Delete a catalog product and redirect back to its admin list."""
+    from models import delete_item
+
+    if not get_by_id(item_id):
+        return redirect(list_route)
+    if delete_item(table, item_id):
+        return redirect(list_route + '?deleted=1')
+    return redirect(list_route + '?error=delete_failed')
 
 
 @app.route('/admin/plants', methods=['GET'])
@@ -826,6 +841,13 @@ def admin_plants_edit(id):
         form_action=url_for('admin_plants_edit', id=id),
         catalog_files=_catalog_files_for('plants', id),
     )
+
+
+@app.route('/admin/plants/<int:id>/delete', methods=['POST'])
+@admin_required
+def admin_plants_delete(id):
+    from models import get_plant_by_id
+    return _admin_delete_product('plants', id, get_plant_by_id, url_for('admin_plants'))
 
 
 def _save_tool_food_form(table, add_fn, update_fn, list_route, edit_template, item_id=None):
@@ -986,6 +1008,13 @@ def admin_tools_edit(id):
     )
 
 
+@app.route('/admin/tools/<int:id>/delete', methods=['POST'])
+@admin_required
+def admin_tools_delete(id):
+    from models import get_tool_by_id
+    return _admin_delete_product('tools', id, get_tool_by_id, url_for('admin_tools'))
+
+
 @app.route('/admin/tools/<int:id>/image/<int:slot>')
 def serve_tool_image(id, slot):
     """Serve a tool image from the database."""
@@ -1084,6 +1113,13 @@ def admin_foods_edit(id):
     )
 
 
+@app.route('/admin/foods/<int:id>/delete', methods=['POST'])
+@admin_required
+def admin_foods_delete(id):
+    from models import get_food_by_id
+    return _admin_delete_product('foods', id, get_food_by_id, url_for('admin_foods'))
+
+
 @app.route('/admin/foods/<int:id>/image/<int:slot>')
 def serve_food_image(id, slot):
     """Serve a food image from the database."""
@@ -1138,4 +1174,4 @@ def admin_logout():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='localhost')

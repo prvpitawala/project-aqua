@@ -228,6 +228,35 @@ def update_food(food_id, name, price, category, description, weight=None, in_sto
     return _update_item('foods', food_id, name, price, category, description, weight, in_stock)
 
 
+_CATALOG_TABLE_PRODUCT_TYPES = {
+    'plants': 'plant',
+    'tools': 'tool',
+    'foods': 'food',
+}
+
+
+def delete_item(table, item_id):
+    """Delete a catalog item and its attached documents. Returns True on success."""
+    if table not in _CATALOG_TABLE_PRODUCT_TYPES:
+        return False
+    product_type = _CATALOG_TABLE_PRODUCT_TYPES[table]
+    ensure_product_files_table()
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                'DELETE FROM product_files WHERE product_type = %s AND product_id = %s',
+                (product_type, item_id),
+            )
+            cur.execute(f'DELETE FROM {table} WHERE id = %s', (item_id,))
+            deleted = cur.rowcount
+        conn.commit()
+        conn.close()
+        return deleted > 0
+    except Exception:
+        return False
+
+
 def _get_items(table):
     """Generic fetch for plants, tools, or foods (without blob data)."""
     try:
