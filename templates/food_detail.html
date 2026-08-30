@@ -13,8 +13,16 @@
 @media (max-width: 768px) {
     .detail-layout { grid-template-columns: 1fr; }
 }
-.detail-image {
+.detail-gallery {
     max-width: 560px;
+}
+.detail-media {
+    max-width: 560px;
+}
+.detail-cart-action {
+    margin-top: 1rem;
+}
+.detail-image {
     aspect-ratio: 1;
     background: #f1f5f9;
     border-radius: 16px;
@@ -24,6 +32,48 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
+    display: block;
+}
+.detail-image-empty {
+    width: 100%;
+    height: 100%;
+    min-height: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--slate-500);
+    font-size: 0.9375rem;
+}
+.detail-thumbs {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+    flex-wrap: wrap;
+}
+.detail-thumb {
+    width: 72px;
+    height: 72px;
+    padding: 0;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    background: #fff;
+    flex-shrink: 0;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.detail-thumb:hover {
+    border-color: var(--aqua-400);
+}
+.detail-thumb.active {
+    border-color: var(--aqua-500);
+    box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2);
+}
+.detail-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
 }
 .detail-info h1 {
     font-size: 1.75rem;
@@ -94,8 +144,12 @@
 <a href="{{ url_for('foods') }}" class="btn-back">Back to Foods</a>
 
 <div class="detail-layout">
-    <div class="detail-image">
-        <img src="{{ item.image }}" alt="{{ item.name }}">
+    <div class="detail-media">
+        {% set gallery_item = item %}
+        {% include 'partials/product_detail_gallery.html' %}
+        {% set cart_item = item %}
+        {% set cart_type = 'food' %}
+        {% include 'partials/product_detail_cart.html' %}
     </div>
     <div class="detail-info">
         <h1>{{ item.name }}</h1>
@@ -105,14 +159,6 @@
         {% endif %}
         <div class="detail-price">LKR {{ "%.2f"|format(item.price) }}</div>
         <div class="detail-desc">{{ item.description }}</div>
-        {% if item.in_stock | default(true) %}
-        <button type="button" class="btn-add-detail btn-add-cart" data-id="{{ item.id }}" data-type="food" data-name="{{ item.name }}" data-price="{{ item.price }}" data-image="{{ item.image }}" data-weight="{{ item.weight or '' }}">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 2a1 1 0 0 0-.9.6L2.2 9.4A1 1 0 0 0 3 11h1.4l1.8 9.2a1 1 0 0 0 1 .8h9.6a1 1 0 0 0 1-.8L18.6 11H21a1 1 0 0 0 .8-1.6L18.9 2.6A1 1 0 0 0 18 2H6zm3.2 9h5.6l-1.2 6H10.4L9.2 11z"/></svg>
-            Add to cart
-        </button>
-        {% else %}
-        <span class="btn-add-detail btn-add-detail-disabled" aria-disabled="true">Out of stock</span>
-        {% endif %}
     </div>
 </div>
 {% endblock %}

@@ -1,0 +1,10 @@
+{% if item.get('care_level') or item.get('co2_condition') or item.get('light_condition') %}
+<div class="detail-care">
+    <div class="detail-care-title">Care details</div>
+    <div class="detail-badges">
+        {% if item.get('care_level') %}<span class="detail-badge">Care: {{ item.care_level }}</span>{% endif %}
+        {% if item.get('co2_condition') %}<span class="detail-badge">CO₂: {{ item.co2_condition }}</span>{% endif %}
+        {% if item.get('light_condition') %}<span class="detail-badge">Light: {{ item.light_condition }}</span>{% endif %}
+    </div>
+</div>
+{% endif %}

@@ -386,7 +386,6 @@
     border: 1px solid transparent;
 }
 .checkout-alert.error {
-    display: block;
     background: #fef2f2;
     color: #b91c1c;
     border-color: #fecaca;
@@ -534,7 +533,10 @@
             <p>Where should we send your order?</p>
         </div>
         <div class="checkout-panel-body">
-            <div id="checkoutError" class="checkout-alert error" role="alert"></div>
+            <div id="checkoutError" class="checkout-alert error alert-dismissible" role="alert" style="display:none">
+                <span class="alert-banner-text" id="checkoutErrorText"></span>
+                <button type="button" class="alert-banner-close" aria-label="Close notification">&times;</button>
+            </div>
             <form id="checkoutForm">
                 <div class="checkout-form-section">
                     <div class="checkout-form-section-title">
@@ -659,6 +661,7 @@
     var deliveryEl = document.getElementById('checkoutDelivery');
     var totalEl = document.getElementById('checkoutTotal');
     var errorEl = document.getElementById('checkoutError');
+    var errorTextEl = document.getElementById('checkoutErrorText');
     var form = document.getElementById('checkoutForm');
     var submitBtn = document.getElementById('placeOrderBtn');
 
@@ -806,8 +809,8 @@
                 }
             })
             .catch(function(err) {
-                errorEl.textContent = err.message || 'Could not place order.';
-                errorEl.style.display = 'block';
+                if (errorTextEl) errorTextEl.textContent = err.message || 'Could not place order.';
+                errorEl.style.display = 'flex';
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Place order';
             });

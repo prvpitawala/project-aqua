@@ -1,4 +1,5 @@
 {% extends "partials/base.html" %}
+{% from 'partials/dismissible_alert.html' import dismissible %}
 
 {% block title %}{{ 'Edit Food' if is_edit else 'Add Food' }} - AquaStore Admin{% endblock %}
 
@@ -19,9 +20,7 @@
         </div>
     </header>
 
-    {% if message %}
-    <div class="admin-form-alert admin-form-alert--{{ message_type }}">{{ message }}</div>
-    {% endif %}
+    {{ dismissible(message, message_type or 'success', 'admin-form-alert') }}
 
     <form method="post" action="{{ form_action }}" enctype="multipart/form-data" class="admin-form">
         <section class="form-card">

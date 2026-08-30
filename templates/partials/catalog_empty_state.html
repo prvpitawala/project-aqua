@@ -1,0 +1,14 @@
+{% set has_filters = request.args.getlist('stock') or request.args.getlist('category') or request.args.getlist('price') or request.args.getlist('co2') or request.args.getlist('light') %}
+<div class="catalog-empty-state" role="status">
+    <p class="catalog-empty-title">No results found</p>
+    <p class="catalog-empty-text">
+        {% if has_filters %}
+        Nothing matches your current filters. Try different options or clear all filters.
+        {% else %}
+        There are no {{ item_label|default('item') }}s to show right now.
+        {% endif %}
+    </p>
+    {% if has_filters %}
+    <button type="button" class="filter-clear-btn catalog-empty-clear" onclick="location.href=location.pathname">Clear all filters</button>
+    {% endif %}
+</div>

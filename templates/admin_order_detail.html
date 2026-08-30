@@ -1,4 +1,5 @@
 {% extends "partials/base.html" %}
+{% from 'partials/dismissible_alert.html' import dismissible %}
 
 {% block title %}Order #{{ order.id }} - AquaStore Admin{% endblock %}
 
@@ -14,9 +15,7 @@
         <span class="admin-badge status-{{ order_status }}">{{ order_status|capitalize }}</span>
     </div>
 
-    {% if message %}
-    <div class="admin-alert admin-alert-{{ message_type or 'success' }}">{{ message }}</div>
-    {% endif %}
+    {{ dismissible(message, message_type or 'success') }}
 
     <div class="order-detail-layout">
         <div class="admin-form-card">
@@ -76,7 +75,7 @@
     <div class="admin-panel order-items-panel">
         <div class="admin-panel-head">
             <h2>Order items</h2>
-            <span>{{ order.items|length }} line item{{ 's' if order.items|length != 1 else '' }}</span>
+            <span>{{ order['items']|length }} line item{{ 's' if order['items']|length != 1 else '' }}</span>
         </div>
         <div class="admin-table-wrap">
             <table class="admin-table">
@@ -90,9 +89,26 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for item in order.items %}
+                    {% for item in order['items'] %}
                     <tr>
-                        <td class="admin-cell-name">{{ item.product_name }}</td>
+                        <td>
+                            <div class="order-item-product">
+                                {% if item.image %}
+                                <button
+                                    type="button"
+                                    class="order-item-thumb-btn"
+                                    data-image="{{ item.image }}"
+                                    data-name="{{ item.product_name }}"
+                                    aria-label="View image for {{ item.product_name }}"
+                                >
+                                    <img src="{{ item.image }}" alt="" class="order-item-thumb" loading="lazy">
+                                </button>
+                                {% else %}
+                                <div class="order-item-thumb order-item-thumb-placeholder" aria-hidden="true">🛍</div>
+                                {% endif %}
+                                <span class="admin-cell-name">{{ item.product_name }}</span>
+                            </div>
+                        </td>
                         <td class="admin-cell-muted">{{ item.product_type|capitalize }}</td>
                         <td>LKR {{ "%.2f"|format(item.unit_price) }}</td>
                         <td>{{ item.quantity }}</td>
@@ -106,6 +122,22 @@
             <div class="order-total-row"><span>Subtotal</span><span>LKR {{ "%.2f"|format(order.subtotal) }}</span></div>
             <div class="order-total-row"><span>Delivery</span><span>LKR {{ "%.2f"|format(order.delivery_fee) }}</span></div>
             <div class="order-total-row order-grand-total"><span>Total</span><span>LKR {{ "%.2f"|format(order.total) }}</span></div>
+        </div>
+    </div>
+</div>
+
+<div id="orderImageModal" class="order-image-modal" aria-hidden="true">
+    <div class="order-image-overlay" data-close-image></div>
+    <div class="order-image-card" role="dialog" aria-modal="true" aria-labelledby="orderImageTitle">
+        <div class="order-image-card-head">
+            <h2 id="orderImageTitle">Product image</h2>
+            <button type="button" class="order-image-close" data-close-image aria-label="Close">&times;</button>
+        </div>
+        <div class="order-image-card-body">
+            <img id="orderImagePreview" src="" alt="">
+        </div>
+        <div class="order-image-card-foot">
+            <button type="button" class="admin-btn" data-close-image>Cancel</button>
         </div>
     </div>
 </div>
@@ -137,6 +169,44 @@
     line-height: 1.45;
 }
 .order-items-panel { margin-top: 0; }
+.order-item-product {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.order-item-thumb-btn {
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-radius: 8px;
+    flex-shrink: 0;
+    line-height: 0;
+}
+.order-item-thumb-btn:hover .order-item-thumb,
+.order-item-thumb-btn:focus-visible .order-item-thumb {
+    border-color: var(--aqua-400);
+    box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2);
+}
+.order-item-thumb-btn:focus-visible {
+    outline: none;
+}
+.order-item-thumb {
+    width: 64px;
+    height: 64px;
+    border-radius: 8px;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+}
+.order-item-thumb-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: var(--slate-400);
+}
 .order-totals-wrap {
     margin-left: auto;
     max-width: 320px;
@@ -160,5 +230,115 @@
     margin-top: 0.5rem;
 }
 .order-grand-total span:last-child { color: var(--aqua-600); }
+.order-image-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+.order-image-modal.open { display: flex; }
+.order-image-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+}
+.order-image-card {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
+    overflow: hidden;
+}
+.order-image-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+.order-image-card-head h2 {
+    margin: 0;
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: var(--slate-900);
+}
+.order-image-close {
+    border: none;
+    background: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: var(--slate-500);
+    cursor: pointer;
+    padding: 0.15rem 0.35rem;
+    border-radius: 6px;
+}
+.order-image-close:hover { color: var(--slate-800); background: #f1f5f9; }
+.order-image-card-body {
+    padding: 1rem 1.25rem;
+    background: #f8fafc;
+}
+.order-image-card-body img {
+    display: block;
+    width: 100%;
+    max-height: 60vh;
+    object-fit: contain;
+    border-radius: 12px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+}
+.order-image-card-foot {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0.85rem 1.25rem 1.1rem;
+    border-top: 1px solid #e2e8f0;
+}
 </style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    var modal = document.getElementById('orderImageModal');
+    var preview = document.getElementById('orderImagePreview');
+    var title = document.getElementById('orderImageTitle');
+    if (!modal || !preview || !title) return;
+
+    function openImageModal(imageUrl, productName) {
+        preview.src = imageUrl;
+        preview.alt = productName;
+        title.textContent = productName;
+        modal.classList.add('open');
+        modal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeImageModal() {
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden', 'true');
+        preview.src = '';
+        preview.alt = '';
+    }
+
+    document.querySelectorAll('.order-item-thumb-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            openImageModal(btn.dataset.image, btn.dataset.name || 'Product image');
+        });
+    });
+
+    modal.querySelectorAll('[data-close-image]').forEach(function(el) {
+        el.addEventListener('click', closeImageModal);
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal.classList.contains('open')) {
+            closeImageModal();
+        }
+    });
+})();
+</script>
 {% endblock %}

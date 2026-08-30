@@ -1,0 +1,6 @@
+{% macro row(uid, value, css_class, checked, label) %}
+<div class="filter-option">
+    <input type="checkbox" id="{{ uid }}" value="{{ value|e }}" class="{{ css_class }}" data-catalog-filter{% if checked %} checked{% endif %}>
+    <label for="{{ uid }}">{{ label }}</label>
+</div>
+{% endmacro %}

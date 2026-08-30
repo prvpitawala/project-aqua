@@ -1,4 +1,5 @@
 {% extends "partials/base.html" %}
+{% from 'partials/catalog_filters.html' import row %}
 
 {% block title %}Accessories - AquaStore{% endblock %}
 
@@ -178,30 +179,31 @@
     <aside class="shop-sidebar">
         <div class="sidebar-section">
             <h3>Stock status</h3>
-            <label><input type="checkbox" value="in" class="filter-stock" {{ 'checked' if 'in' in (stock_filter or []) else '' }}> In stock</label>
-            <label><input type="checkbox" value="out" class="filter-stock" {{ 'checked' if 'out' in (stock_filter or []) else '' }}> Out of stock</label>
+            {{ row('filter-stock-in', 'in', 'filter-stock', 'in' in (stock_filter or []), 'In stock') }}
+            {{ row('filter-stock-out', 'out', 'filter-stock', 'out' in (stock_filter or []), 'Out of stock') }}
         </div>
         <div class="sidebar-section">
             <h3>Category</h3>
-            {% for cat in ['Aquarium Soil', 'water Pump', 'Filter Media', 'CO2 accessaries', 'Fertilizers & Treatment', 'Temperature accessories', 'Air pumps', 'Other product'] %}
-            <label><input type="checkbox" name="category" value="{{ cat }}" class="filter-category" {{ 'checked' if cat in (category_filter or []) else '' }}> {{ cat }}</label>
+            {% for cat in accessory_categories %}
+            {{ row('filter-cat-' ~ loop.index, cat, 'filter-category', cat in (category_filter or []), cat) }}
             {% endfor %}
         </div>
-        <div class="sidebar-section">
-            <h3>Price</h3>
-            <label><input type="checkbox"> Under LKR 1000</label>
-            <label><input type="checkbox"> LKR 1000 - 2000</label>
-            <label><input type="checkbox"> LKR 2000 - 3000</label>
-        </div>
+        {% set catalog_price_ranges = accessory_price_ranges %}
+        {% set price_id_prefix = 'filter-price-' %}
+        {% set price_css_class = 'filter-price' %}
+        {% include 'partials/catalog_price_filter_section.html' %}
         <div class="sidebar-section">
             <h3>Brand</h3>
-            <label><input type="checkbox"> All</label>
             <label><input type="checkbox"> Premium</label>
             <label><input type="checkbox"> Standard</label>
         </div>
+        {% include 'partials/filter_clear_all.html' %}
     </aside>
 
     <div class="products-section">
+        {% if total is defined and total == 0 %}
+        {% include 'partials/catalog_empty_state.html' %}
+        {% else %}
         <div id="productsGrid" class="products-grid">
             {% for item in accessories %}
             <div class="product-card" data-id="{{ item.id }}">
@@ -231,32 +233,9 @@
             {% endfor %}
         </div>
         {% include 'partials/pagination.html' %}
+        {% endif %}
     </div>
 </div>
 
-<script>
-(function() {
-    var grid = document.getElementById('productsGrid');
-    function getStockParams() {
-        var checkboxes = document.querySelectorAll('.filter-stock:checked');
-        return Array.prototype.map.call(checkboxes, function(cb) { return cb.value; });
-    }
-    function getCategoryParams() {
-        var checkboxes = document.querySelectorAll('.filter-category:checked');
-        return Array.prototype.map.call(checkboxes, function(cb) { return cb.value; });
-    }
-    function applyPublicFilters() {
-        var stock = getStockParams();
-        var categories = getCategoryParams();
-        var params = new URLSearchParams();
-        stock.forEach(function(v) { params.append('stock', v); });
-        categories.forEach(function(v) { params.append('category', v); });
-        var qs = params.toString();
-        globalThis.location.search = qs ? '?' + qs : '';
-    }
-    document.querySelectorAll('.filter-stock, .filter-category').forEach(function(cb) {
-        cb.addEventListener('change', applyPublicFilters);
-    });
-})();
-</script>
+{% include 'partials/catalog_filter_scripts.html' %}
 {% endblock %}

@@ -77,6 +77,46 @@
     </div>
 </section>
 
+<section class="testimonials-section">
+    <h2 class="section-title">What Our Customers Say</h2>
+    <p class="section-subtitle">Trusted by aquarists across Sri Lanka</p>
+    <div class="testimonials-carousel" id="testimonialsCarousel">
+        <div class="testimonials-viewport">
+            <div class="testimonials-track" id="testimonialsTrack">
+                {% for item in testimonials %}
+                <article class="testimonial-card">
+                    <div class="testimonial-stars" aria-label="{{ item.rating }} out of 5 stars">
+                        {% for i in range(5) %}
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="{{ 'star-filled' if i < item.rating else 'star-empty' }}" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        {% endfor %}
+                    </div>
+                    <blockquote class="testimonial-quote">“{{ item.quote }}”</blockquote>
+                    <footer class="testimonial-author">
+                        <span class="testimonial-avatar" aria-hidden="true">{{ item.name[:1] }}</span>
+                        <div>
+                            <cite class="testimonial-name">{{ item.name }}</cite>
+                            <span class="testimonial-detail">{{ item.detail }}</span>
+                        </div>
+                    </footer>
+                </article>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="testimonials-dots" id="testimonialsDots" role="tablist" aria-label="Testimonials">
+            {% for item in testimonials %}
+            <button
+                type="button"
+                class="testimonial-dot{{ ' active' if loop.first else '' }}"
+                data-index="{{ loop.index0 }}"
+                role="tab"
+                aria-selected="{{ 'true' if loop.first else 'false' }}"
+                aria-label="Testimonial {{ loop.index }}"
+            ></button>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
 <section class="about-section">
     <h2 class="section-title">About AquaStore</h2>
     <div class="about-content">
@@ -242,6 +282,119 @@
     font-weight: 700;
     color: var(--aqua-600);
 }
+.testimonials-section {
+    margin-top: 4rem;
+    padding-top: 2rem;
+}
+.testimonials-carousel {
+    max-width: 1100px;
+    margin: 0 auto;
+}
+.testimonials-viewport {
+    overflow: hidden;
+}
+.testimonials-track {
+    display: flex;
+    gap: 1.25rem;
+    transition: transform 0.5s ease;
+    will-change: transform;
+}
+.testimonial-card {
+    flex: 0 0 calc((100% - 2.5rem) / 3);
+    min-width: 0;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    box-sizing: border-box;
+}
+.testimonials-dots {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 1.25rem;
+}
+.testimonial-dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 999px;
+    border: none;
+    padding: 0;
+    background: #cbd5e1;
+    cursor: pointer;
+    transition: width 0.2s ease, background 0.2s ease;
+}
+.testimonial-dot.active {
+    width: 1.5rem;
+    background: linear-gradient(135deg, var(--aqua-600), var(--aqua-500));
+}
+@media (max-width: 900px) {
+    .testimonial-card {
+        flex: 0 0 calc((100% - 1.25rem) / 2);
+    }
+}
+@media (max-width: 640px) {
+    .testimonial-card {
+        flex: 0 0 100%;
+    }
+}
+.testimonial-stars {
+    display: flex;
+    gap: 0.15rem;
+}
+.testimonial-stars svg {
+    width: 1.05rem;
+    height: 1.05rem;
+}
+.testimonial-stars .star-filled {
+    color: #f59e0b;
+}
+.testimonial-stars .star-empty {
+    color: #e2e8f0;
+}
+.testimonial-quote {
+    margin: 0;
+    color: var(--slate-700);
+    line-height: 1.65;
+    font-size: 0.9375rem;
+    flex: 1;
+}
+.testimonial-author {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: auto;
+}
+.testimonial-avatar {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--aqua-600), var(--aqua-400));
+    color: #fff;
+    font-weight: 700;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+.testimonial-name {
+    display: block;
+    font-style: normal;
+    font-weight: 600;
+    color: var(--slate-900);
+    font-size: 0.9375rem;
+}
+.testimonial-detail {
+    display: block;
+    color: var(--slate-500);
+    font-size: 0.8125rem;
+    margin-top: 0.15rem;
+}
 .about-section {
     margin-top: 4rem;
     padding-top: 2rem;
@@ -262,4 +415,117 @@
     margin-bottom: 0;
 }
 </style>
+<script>
+(function() {
+    var track = document.getElementById('testimonialsTrack');
+    var dotsWrap = document.getElementById('testimonialsDots');
+    var carousel = document.getElementById('testimonialsCarousel');
+    if (!track) return;
+
+    var originals = Array.prototype.slice.call(track.querySelectorAll('.testimonial-card'));
+    var total = originals.length;
+    if (total === 0) return;
+
+    var index = 0;
+    var timer = null;
+    var visible = 3;
+
+    function getVisibleCount() {
+        if (globalThis.innerWidth <= 640) return 1;
+        if (globalThis.innerWidth <= 900) return 2;
+        return 3;
+    }
+
+    function rebuildClones() {
+        track.querySelectorAll('.testimonial-card.is-clone').forEach(function(node) {
+            node.remove();
+        });
+        visible = getVisibleCount();
+        var cloneCount = Math.min(visible, total);
+        for (var i = 0; i < cloneCount; i++) {
+            var clone = originals[i].cloneNode(true);
+            clone.classList.add('is-clone');
+            clone.setAttribute('aria-hidden', 'true');
+            track.appendChild(clone);
+        }
+    }
+
+    function slideStep() {
+        var card = track.querySelector('.testimonial-card');
+        if (!card) return 0;
+        var gap = parseFloat(getComputedStyle(track).gap) || 0;
+        return card.offsetWidth + gap;
+    }
+
+    function updateDots(activeIndex) {
+        if (!dotsWrap) return;
+        var dots = dotsWrap.querySelectorAll('.testimonial-dot');
+        dots.forEach(function(dot, i) {
+            var active = i === activeIndex;
+            dot.classList.toggle('active', active);
+            dot.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+    }
+
+    function goTo(nextIndex, animate) {
+        track.style.transition = animate ? 'transform 0.5s ease' : 'none';
+        track.style.transform = 'translateX(-' + (nextIndex * slideStep()) + 'px)';
+        updateDots(nextIndex % total);
+        if (!animate) {
+            track.offsetHeight;
+            track.style.transition = 'transform 0.5s ease';
+        }
+    }
+
+    function nextSlide() {
+        index += 1;
+        goTo(index, true);
+        if (index >= total) {
+            globalThis.setTimeout(function() {
+                index = 0;
+                goTo(0, false);
+            }, 500);
+        }
+    }
+
+    function startAutoPlay() {
+        stopAutoPlay();
+        timer = globalThis.setInterval(nextSlide, 5000);
+    }
+
+    function stopAutoPlay() {
+        if (timer) {
+            globalThis.clearInterval(timer);
+            timer = null;
+        }
+    }
+
+    rebuildClones();
+    goTo(0, false);
+    startAutoPlay();
+
+    if (dotsWrap) {
+        dotsWrap.querySelectorAll('.testimonial-dot').forEach(function(dot) {
+            dot.addEventListener('click', function() {
+                index = parseInt(this.dataset.index, 10) || 0;
+                goTo(index, true);
+                startAutoPlay();
+            });
+        });
+    }
+
+    if (carousel) {
+        carousel.addEventListener('mouseenter', stopAutoPlay);
+        carousel.addEventListener('mouseleave', startAutoPlay);
+    }
+
+    globalThis.addEventListener('resize', function() {
+        var prevVisible = visible;
+        rebuildClones();
+        if (index >= total) index = 0;
+        goTo(index, false);
+        if (prevVisible !== visible) startAutoPlay();
+    });
+})();
+</script>
 {% endblock %}

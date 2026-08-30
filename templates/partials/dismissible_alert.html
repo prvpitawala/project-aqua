@@ -1,0 +1,18 @@
+{% macro dismissible(message, kind='success', base='admin-alert') %}
+{% if message %}
+{% set sep = '--' if base == 'admin-form-alert' else '-' %}
+<div class="{{ base }} {{ base }}{{ sep }}{{ kind }} alert-dismissible" role="alert">
+    <span class="alert-banner-text">{{ message }}</span>
+    <button type="button" class="alert-banner-close" aria-label="Close notification">&times;</button>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro dismissible_with_classes(message, classes) %}
+{% if message %}
+<div class="{{ classes }} alert-dismissible" role="alert">
+    <span class="alert-banner-text">{{ message }}</span>
+    <button type="button" class="alert-banner-close" aria-label="Close notification">&times;</button>
+</div>
+{% endif %}
+{% endmacro %}

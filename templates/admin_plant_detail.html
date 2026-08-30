@@ -17,8 +17,10 @@
 .detail-desc { color: var(--slate-600); line-height: 1.7; margin-bottom: 1.5rem; white-space: pre-line; }
 .btn-edit-detail { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; background: linear-gradient(135deg, var(--aqua-600), var(--aqua-500)); color: white; border: none; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; font-family: inherit; text-decoration: none; }
 .btn-edit-detail:hover { opacity: 0.9; }
-.detail-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
-.detail-badge { font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 8px; background: rgba(6, 182, 212, 0.12); color: var(--aqua-700); }
+.detail-care { margin-bottom: 1rem; }
+.detail-care-title { font-size: 0.8125rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--slate-500); margin-bottom: 0.5rem; }
+.detail-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.detail-badge { font-size: 0.8125rem; font-weight: 600; padding: 0.35rem 0.65rem; border-radius: 8px; background: rgba(6, 182, 212, 0.12); color: var(--aqua-600); }
 </style>
 {% endblock %}
 
@@ -39,11 +41,8 @@
         <h1>{{ plant.name }}</h1>
         <div class="detail-meta">Category: {{ plant.category }}</div>
         {% if plant.weight %}<div class="detail-meta">Weight: {{ plant.weight }}</div>{% endif %}
-        <div class="detail-badges">
-            {% if plant.get('care_level') %}<span class="detail-badge">Care: {{ plant.care_level }}</span>{% endif %}
-            {% if plant.get('co2_condition') %}<span class="detail-badge">CO₂: {{ plant.co2_condition }}</span>{% endif %}
-            {% if plant.get('light_condition') %}<span class="detail-badge">Light: {{ plant.light_condition }}</span>{% endif %}
-        </div>
+        {% set item = plant %}
+        {% include 'partials/plant_care_details.html' %}
         {% if plant.in_stock %}
         <span class="detail-stock detail-stock-in">In stock</span>
         {% else %}

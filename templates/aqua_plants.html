@@ -1,4 +1,5 @@
 {% extends "partials/base.html" %}
+{% from 'partials/catalog_filters.html' import row %}
 
 {% block title %}Aqua Plants - AquaStore{% endblock %}
 
@@ -186,36 +187,38 @@
     <aside class="shop-sidebar">
         <div class="sidebar-section">
             <h3>Stock status</h3>
-            <label><input type="checkbox" value="in" class="filter-stock" {{ 'checked' if 'in' in (stock_filter or []) else '' }}> In stock</label>
-            <label><input type="checkbox" value="out" class="filter-stock" {{ 'checked' if 'out' in (stock_filter or []) else '' }}> Out of stock</label>
+            {{ row('filter-stock-in', 'in', 'filter-stock', 'in' in (stock_filter or []), 'In stock') }}
+            {{ row('filter-stock-out', 'out', 'filter-stock', 'out' in (stock_filter or []), 'Out of stock') }}
         </div>
         <div class="sidebar-section">
             <h3>Category</h3>
-            {% for cat in ['Anubias & Fern', 'Background Plant', 'Bucephalandra', 'Carpeting plant', 'Cryptocoryne', 'Epiphyte plants', 'Floating plants', 'Ludwigia Varieties', 'Midground Plant', 'Moss', 'Rare plants', 'Rotala Varieties', 'Other'] %}
-            <label><input type="checkbox" name="category" value="{{ cat }}" class="filter-category" {{ 'checked' if cat in (category_filter or []) else '' }}> {{ cat }}</label>
+            {% for cat in plant_categories %}
+            {{ row('filter-cat-' ~ loop.index, cat, 'filter-category', cat in (category_filter or []), cat) }}
             {% endfor %}
         </div>
-        <div class="sidebar-section">
-            <h3>Price</h3>
-            <label><input type="checkbox"> Under LKR 500</label>
-            <label><input type="checkbox"> LKR 500 - 1000</label>
-            <label><input type="checkbox"> LKR 1000 - 2000</label>
-        </div>
+        {% set catalog_price_ranges = plant_price_ranges %}
+        {% set price_id_prefix = 'filter-price-' %}
+        {% set price_css_class = 'filter-price' %}
+        {% include 'partials/catalog_price_filter_section.html' %}
         <div class="sidebar-section">
             <h3>CO₂ condition</h3>
-            <label><input type="checkbox" name="co2" value="High CO2" class="filter-co2" {{ 'checked' if 'High CO2' in (co2_filter or []) else '' }}> High CO2</label>
-            <label><input type="checkbox" name="co2" value="Medium CO2" class="filter-co2" {{ 'checked' if 'Medium CO2' in (co2_filter or []) else '' }}> Medium CO2</label>
-            <label><input type="checkbox" name="co2" value="Low CO2" class="filter-co2" {{ 'checked' if 'Low CO2' in (co2_filter or []) else '' }}> Low CO2</label>
+            {{ row('filter-co2-high', 'High CO2', 'filter-co2', 'High CO2' in (co2_filter or []), 'High CO2') }}
+            {{ row('filter-co2-medium', 'Medium CO2', 'filter-co2', 'Medium CO2' in (co2_filter or []), 'Medium CO2') }}
+            {{ row('filter-co2-low', 'Low CO2', 'filter-co2', 'Low CO2' in (co2_filter or []), 'Low CO2') }}
         </div>
         <div class="sidebar-section">
             <h3>Light condition</h3>
-            <label><input type="checkbox" name="light" value="High Light" class="filter-light" {{ 'checked' if 'High Light' in (light_filter or []) else '' }}> High Light</label>
-            <label><input type="checkbox" name="light" value="Medium Light" class="filter-light" {{ 'checked' if 'Medium Light' in (light_filter or []) else '' }}> Medium Light</label>
-            <label><input type="checkbox" name="light" value="Low Light" class="filter-light" {{ 'checked' if 'Low Light' in (light_filter or []) else '' }}> Low Light</label>
+            {{ row('filter-light-high', 'High Light', 'filter-light', 'High Light' in (light_filter or []), 'High Light') }}
+            {{ row('filter-light-medium', 'Medium Light', 'filter-light', 'Medium Light' in (light_filter or []), 'Medium Light') }}
+            {{ row('filter-light-low', 'Low Light', 'filter-light', 'Low Light' in (light_filter or []), 'Low Light') }}
         </div>
+        {% include 'partials/filter_clear_all.html' %}
     </aside>
 
     <div class="products-section">
+        {% if total is defined and total == 0 %}
+        {% include 'partials/catalog_empty_state.html' %}
+        {% else %}
         <div id="productsGrid" class="products-grid">
             {% for plant in plants %}
             <div class="product-card" data-plant-id="{{ plant.id }}" data-detail-url="{{ url_for('plant_detail', id=plant.id) }}">
@@ -245,44 +248,9 @@
             {% endfor %}
         </div>
         {% include 'partials/pagination.html' %}
+        {% endif %}
     </div>
 </div>
 
-<script>
-(function() {
-    var grid = document.getElementById('productsGrid');
-    function getCo2Params() {
-        var checkboxes = document.querySelectorAll('.filter-co2:checked');
-        return Array.prototype.map.call(checkboxes, function(cb) { return cb.value; });
-    }
-    function getStockParams() {
-        var checkboxes = document.querySelectorAll('.filter-stock:checked');
-        return Array.prototype.map.call(checkboxes, function(cb) { return cb.value; });
-    }
-    function getLightParams() {
-        var checkboxes = document.querySelectorAll('.filter-light:checked');
-        return Array.prototype.map.call(checkboxes, function(cb) { return cb.value; });
-    }
-    function getCategoryParams() {
-        var checkboxes = document.querySelectorAll('.filter-category:checked');
-        return Array.prototype.map.call(checkboxes, function(cb) { return cb.value; });
-    }
-    function applyPublicFilters() {
-        var co2 = getCo2Params();
-        var light = getLightParams();
-        var stock = getStockParams();
-        var categories = getCategoryParams();
-        var params = new URLSearchParams();
-        co2.forEach(function(v) { params.append('co2', v); });
-        light.forEach(function(v) { params.append('light', v); });
-        stock.forEach(function(v) { params.append('stock', v); });
-        categories.forEach(function(v) { params.append('category', v); });
-        var qs = params.toString();
-        globalThis.location.search = qs ? '?' + qs : '';
-    }
-    document.querySelectorAll('.filter-co2, .filter-light, .filter-stock, .filter-category').forEach(function(cb) {
-        cb.addEventListener('change', applyPublicFilters);
-    });
-})();
-</script>
+{% include 'partials/catalog_filter_scripts.html' %}
 {% endblock %}

@@ -1,0 +1,7 @@
+{% from 'partials/catalog_filters.html' import row %}
+<div class="sidebar-section">
+    <h3>Price</h3>
+    {% for pr in catalog_price_ranges %}
+    {{ row(price_id_prefix ~ loop.index, pr.id, price_css_class, pr.id in (price_filter or []), pr.label) }}
+    {% endfor %}
+</div>

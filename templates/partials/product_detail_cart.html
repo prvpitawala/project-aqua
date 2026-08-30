@@ -1,0 +1,10 @@
+<div class="detail-cart-action">
+    {% if cart_item.in_stock | default(true) %}
+    <button type="button" class="btn-add-detail btn-add-cart" data-id="{{ cart_item.id }}" data-type="{{ cart_type }}" data-name="{{ cart_item.name }}" data-price="{{ cart_item.price }}" data-image="{{ cart_item.image }}" data-weight="{{ cart_item.weight or '' }}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 2a1 1 0 0 0-.9.6L2.2 9.4A1 1 0 0 0 3 11h1.4l1.8 9.2a1 1 0 0 0 1 .8h9.6a1 1 0 0 0 1-.8L18.6 11H21a1 1 0 0 0 .8-1.6L18.9 2.6A1 1 0 0 0 18 2H6zm3.2 9h5.6l-1.2 6H10.4L9.2 11z"/></svg>
+        Add to cart
+    </button>
+    {% else %}
+    <span class="btn-add-detail btn-add-detail-disabled" aria-disabled="true">Out of stock</span>
+    {% endif %}
+</div>

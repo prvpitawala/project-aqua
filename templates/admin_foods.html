@@ -1,4 +1,6 @@
 {% extends "partials/base.html" %}
+{% from 'partials/catalog_filters.html' import row %}
+{% from 'partials/dismissible_alert.html' import dismissible %}
 
 {% block title %}Manage Foods - AquaStore Admin{% endblock %}
 
@@ -31,9 +33,10 @@
 .product-price { font-size: 1rem; font-weight: 700; color: var(--aqua-600); margin: 0; }
 .product-category { font-size: 0.75rem; color: var(--slate-500); margin-top: 0.25rem; }
 .btn-edit, .btn-delete {
-    padding: 0.35rem 0.65rem; min-width: 4.75rem; font-size: 0.75rem; font-weight: 600; font-family: inherit; line-height: 1.2;
-    border-radius: 8px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; text-align: center;
+    width: 2rem; height: 2rem; min-width: 2rem; padding: 0; border-radius: 8px; box-sizing: border-box;
+    display: inline-flex; align-items: center; justify-content: center; font-family: inherit;
 }
+.btn-edit svg, .btn-delete svg { width: 1rem; height: 1rem; display: block; }
 .btn-edit { color: var(--aqua-600); background: rgba(6, 182, 212, 0.1); border: 1px solid var(--aqua-400); text-decoration: none; }
 .btn-edit:hover { background: rgba(6, 182, 212, 0.2); }
 .btn-delete { color: #b91c1c; background: rgba(185, 28, 28, 0.1); border: 1px solid #f87171; cursor: pointer; margin: 0; }
@@ -80,34 +83,41 @@
     </div>
 </div>
 
-{% if message %}
-<div class="alert alert-{{ message_type }}">{{ message }}</div>
-{% endif %}
+{{ dismissible(message, message_type or 'success', 'alert') }}
 
 <div class="shop-layout">
     <aside class="shop-sidebar">
         <div class="sidebar-section">
             <h3>Stock status</h3>
-            <label><input type="checkbox" value="in" class="admin-filter-stock" {{ 'checked' if 'in' in (stock_filter or []) else '' }}> In stock</label>
-            <label><input type="checkbox" value="out" class="admin-filter-stock" {{ 'checked' if 'out' in (stock_filter or []) else '' }}> Out of stock</label>
+            {{ row('admin-filter-stock-in', 'in', 'admin-filter-stock', 'in' in (stock_filter or []), 'In stock') }}
+            {{ row('admin-filter-stock-out', 'out', 'admin-filter-stock', 'out' in (stock_filter or []), 'Out of stock') }}
         </div>
         <div class="sidebar-section">
             <h3>Category</h3>
-            <label><input type="checkbox" checked> All Foods</label>
-            <label><input type="checkbox"> Flakes</label>
-            <label><input type="checkbox"> Pellets</label>
-            <label><input type="checkbox"> Freeze-dried</label>
-            <label><input type="checkbox"> Treats</label>
+            {% for cat in food_categories %}
+            {{ row('admin-filter-cat-' ~ loop.index, cat, 'admin-filter-category', cat in (category_filter or []), cat) }}
+            {% endfor %}
         </div>
-        <div class="sidebar-section">
-            <h3>Price</h3>
-            <label><input type="checkbox"> Under LKR 500</label>
-            <label><input type="checkbox"> LKR 500 - 1000</label>
-            <label><input type="checkbox"> LKR 1000 - 1500</label>
-        </div>
+        {% set catalog_price_ranges = food_price_ranges %}
+        {% set price_id_prefix = 'admin-filter-price-' %}
+        {% set price_css_class = 'admin-filter-price' %}
+        {% include 'partials/catalog_price_filter_section.html' %}
+        {% include 'partials/filter_clear_all.html' %}
     </aside>
 
     <div class="products-section">
+        {% set has_filters = request.args.getlist('stock') or request.args.getlist('category') or request.args.getlist('price') %}
+        {% if total is defined and total == 0 %}
+        {% include 'partials/catalog_empty_state.html' %}
+        {% if page == 1 and not has_filters %}
+        <div class="products-grid">
+            <a href="{{ url_for('admin_foods_new') }}" class="product-card add-new-card">
+                <span class="add-icon">+</span>
+                <span class="add-text">Add New Food</span>
+            </a>
+        </div>
+        {% endif %}
+        {% else %}
         <div class="products-grid">
             {% if page == 1 %}
             <a href="{{ url_for('admin_foods_new') }}" class="product-card add-new-card">
@@ -136,9 +146,13 @@
                 <div class="product-card-footer">
                     <span class="product-price">LKR {{ "%.2f"|format(item.price) }}</span>
                     <div class="product-card-actions">
-                        <a href="{{ url_for('admin_foods_edit', id=item.id) }}" class="btn-edit">Edit</a>
+                        <a href="{{ url_for('admin_foods_edit', id=item.id) }}" class="btn-edit" title="Edit" aria-label="Edit food">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                        </a>
                         <form method="post" action="{{ url_for('admin_foods_delete', id=item.id) }}" class="delete-form" onsubmit="return confirm('Delete this food product? This cannot be undone.');">
-                            <button type="submit" class="btn-delete">Delete</button>
+                            <button type="submit" class="btn-delete" title="Delete" aria-label="Delete food">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                            </button>
                         </form>
                     </div>
                 </div>
@@ -146,21 +160,9 @@
             {% endfor %}
         </div>
         {% include 'partials/pagination.html' %}
+        {% endif %}
     </div>
 </div>
 
-<script>
-function applyAdminFilters() {
-    var stock = Array.prototype.map.call(document.querySelectorAll('.admin-filter-stock:checked'), function(cb) { return cb.value; });
-    var params = new URLSearchParams(globalThis.location.search);
-    params.delete('stock');
-    params.delete('page');
-    stock.forEach(function(v) { params.append('stock', v); });
-    var qs = params.toString();
-    globalThis.location.search = qs ? '?' + qs : '';
-}
-document.querySelectorAll('.admin-filter-stock').forEach(function(cb) {
-    cb.addEventListener('change', applyAdminFilters);
-});
-</script>
+{% include 'partials/catalog_filter_scripts.html' %}
 {% endblock %}

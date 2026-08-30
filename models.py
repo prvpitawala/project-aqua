@@ -99,15 +99,159 @@ def _get_plants_items():
             )
             rows = cur.fetchall()
         conn.close()
-        out = []
-        for r in rows:
-            d = dict(r)
-            if 'in_stock' in d and d['in_stock'] is not None:
-                d['in_stock'] = bool(d['in_stock'])
-            out.append(d)
-        return out
+        return _normalize_catalog_rows(rows)
     except Exception:
         return []
+
+
+def _normalize_catalog_rows(rows):
+    out = []
+    for r in rows:
+        d = dict(r)
+        if 'in_stock' in d and d['in_stock'] is not None:
+            d['in_stock'] = bool(d['in_stock'])
+        out.append(d)
+    return out
+
+
+def _catalog_in_clause(column, values):
+    if not values:
+        return None, []
+    placeholders = ','.join(['%s'] * len(values))
+    return f'{column} IN ({placeholders})', list(values)
+
+
+def _catalog_stock_clause(stock):
+    if not stock:
+        return None, []
+    in_ok = 'in' in stock
+    out_ok = 'out' in stock
+    if in_ok and not out_ok:
+        return 'in_stock = %s', [1]
+    if out_ok and not in_ok:
+        return 'in_stock = %s', [0]
+    return None, []
+
+
+_CATALOG_PRICE_BOUNDS = {
+    '0-500': ('lt', 500),
+    '500-1000': ('between', 500, 1000),
+    '1000-1500': ('between', 1000, 1500),
+    '1000-2000': ('between', 1000, 2000),
+    '0-1000': ('lt', 1000),
+    '2000-3000': ('between', 2000, 3000),
+    '2000-5000': ('between', 2000, 5000),
+    '5000+': ('gt', 5000),
+}
+
+PLANT_PRICE_RANGE_IDS = frozenset({'0-500', '500-1000', '1000-2000', '2000-5000', '5000+'})
+FOOD_PRICE_RANGE_IDS = frozenset({'0-500', '500-1000', '1000-1500', '2000-5000', '5000+'})
+ACCESSORY_PRICE_RANGE_IDS = frozenset({'0-1000', '1000-2000', '2000-3000', '2000-5000', '5000+'})
+
+
+def _catalog_price_clause(price_filters, allowed_ids):
+    if not price_filters:
+        return None, []
+    parts = []
+    params = []
+    for price_filter in price_filters:
+        if price_filter not in allowed_ids:
+            continue
+        spec = _CATALOG_PRICE_BOUNDS.get(price_filter)
+        if not spec:
+            continue
+        if spec[0] == 'lt':
+            parts.append('price < %s')
+            params.append(spec[1])
+        elif spec[0] == 'gt':
+            parts.append('price > %s')
+            params.append(spec[1])
+        elif spec[0] == 'between':
+            parts.append('(price >= %s AND price <= %s)')
+            params.extend([spec[1], spec[2]])
+    if not parts:
+        return None, []
+    return '(' + ' OR '.join(parts) + ')', params
+
+
+def _paginate_catalog_query(select_columns, table, page, per_page, where_parts, params):
+    where_sql = ' AND '.join(where_parts) if where_parts else '1=1'
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(f'SELECT COUNT(*) AS n FROM {table} WHERE {where_sql}', params)
+            total = int(cur.fetchone()['n'])
+            total_pages = max(1, (total + per_page - 1) // per_page) if total else 1
+            page = max(1, min(int(page or 1), total_pages))
+            offset = (page - 1) * per_page
+            cur.execute(
+                f'SELECT {select_columns} FROM {table} WHERE {where_sql} ORDER BY created_at DESC LIMIT %s OFFSET %s',
+                params + [int(per_page), int(offset)],
+            )
+            rows = cur.fetchall()
+        conn.close()
+        return _normalize_catalog_rows(rows), total, total_pages, page
+    except Exception:
+        return [], 0, 1, 1
+
+
+def get_plants_paginated(page=1, per_page=20, categories=None, co2=None, light=None, stock=None, prices=None):
+    """Fetch one page of plants with optional filters (SQL LIMIT/OFFSET)."""
+    where_parts = []
+    params = []
+    for clause, clause_params in (
+        _catalog_in_clause('category', categories or []),
+        _catalog_in_clause('co2_condition', co2 or []),
+        _catalog_in_clause('light_condition', light or []),
+        _catalog_stock_clause(stock or []),
+        _catalog_price_clause(prices or [], PLANT_PRICE_RANGE_IDS),
+    ):
+        if clause:
+            where_parts.append(clause)
+            params.extend(clause_params)
+    select = (
+        'id, name, price, category, weight, description, care_level, co2_condition, light_condition, in_stock, '
+        'CASE WHEN image1 IS NOT NULL THEN 1 ELSE 0 END AS has_image1'
+    )
+    return _paginate_catalog_query(select, 'plants', page, per_page, where_parts, params)
+
+
+def get_tools_paginated(page=1, per_page=20, categories=None, stock=None, prices=None):
+    """Fetch one page of tools/accessories with optional filters (SQL LIMIT/OFFSET)."""
+    where_parts = []
+    params = []
+    for clause, clause_params in (
+        _catalog_in_clause('category', categories or []),
+        _catalog_stock_clause(stock or []),
+        _catalog_price_clause(prices or [], ACCESSORY_PRICE_RANGE_IDS),
+    ):
+        if clause:
+            where_parts.append(clause)
+            params.extend(clause_params)
+    select = (
+        'id, name, price, category, weight, description, in_stock, '
+        'CASE WHEN image1 IS NOT NULL THEN 1 ELSE 0 END AS has_image1'
+    )
+    return _paginate_catalog_query(select, 'tools', page, per_page, where_parts, params)
+
+
+def get_foods_paginated(page=1, per_page=20, categories=None, stock=None, prices=None):
+    """Fetch one page of foods with optional filters (SQL LIMIT/OFFSET)."""
+    where_parts = []
+    params = []
+    for clause, clause_params in (
+        _catalog_in_clause('category', categories or []),
+        _catalog_stock_clause(stock or []),
+        _catalog_price_clause(prices or [], FOOD_PRICE_RANGE_IDS),
+    ):
+        if clause:
+            where_parts.append(clause)
+            params.extend(clause_params)
+    select = (
+        'id, name, price, category, weight, description, in_stock, '
+        'CASE WHEN image1 IS NOT NULL THEN 1 ELSE 0 END AS has_image1'
+    )
+    return _paginate_catalog_query(select, 'foods', page, per_page, where_parts, params)
 
 
 def get_plant_image(plant_id, slot):
@@ -269,13 +413,7 @@ def _get_items(table):
             )
             rows = cur.fetchall()
         conn.close()
-        out = []
-        for r in rows:
-            d = dict(r)
-            if 'in_stock' in d and d['in_stock'] is not None:
-                d['in_stock'] = bool(d['in_stock'])
-            out.append(d)
-        return out
+        return _normalize_catalog_rows(rows)
     except Exception:
         return []
 
@@ -757,8 +895,8 @@ def create_order(customer_name, customer_email, customer_phone, delivery_address
         return (None, str(e))
 
 
-def get_orders_paginated(page=1, per_page=15):
-    """Fetch one page of orders. Returns (orders, total, total_pages, current_page)."""
+def get_orders_paginated(page=1, per_page=10):
+    """Fetch one page of orders from the DB (LIMIT/OFFSET). Returns (orders, total, total_pages, current_page)."""
     ensure_orders_tables()
     normalize_order_statuses()
     try:
@@ -773,10 +911,8 @@ def get_orders_paginated(page=1, per_page=15):
                 '''
                 SELECT o.id, o.customer_name, o.customer_email, o.customer_phone,
                        o.subtotal, o.delivery_fee, o.total, o.status, o.created_at,
-                       COUNT(oi.id) AS item_count
+                       (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id) AS item_count
                 FROM orders o
-                LEFT JOIN order_items oi ON oi.order_id = o.id
-                GROUP BY o.id
                 ORDER BY o.created_at DESC
                 LIMIT %s OFFSET %s
                 ''',

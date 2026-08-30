@@ -1,10 +1,26 @@
+{% if total is defined and total > 0 %}
+{% set range_start = (page - 1) * per_page + 1 %}
+{% set range_end = [page * per_page, total]|min %}
 <nav class="admin-pagination" aria-label="{{ pagination_aria_label|default('Pagination') }}">
-    <div class="admin-pagination-info">
-        Page {{ page }} of {{ total_pages }} · {{ total }} {{ item_label|default('items') }} · {{ per_page }} per page
+    <div class="admin-pagination-meta">
+        <div class="admin-pagination-info">
+            Showing {{ range_start }}–{{ range_end }} of {{ total }} {{ item_label|default('items') }}
+            · Page {{ page }} of {{ total_pages }}
+        </div>
+        {% if per_page_options is defined %}
+        <div class="admin-pagination-per-page">
+            <label for="admin_per_page">Per page</label>
+            <select id="admin_per_page" class="admin-select admin-pagination-select" aria-label="Items per page">
+                {% for n in per_page_options %}
+                <option value="{{ n }}" {{ 'selected' if n == per_page else '' }}>{{ n }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
     </div>
     <div class="admin-pagination-links">
         {% if page > 1 %}
-        <a href="{{ url_for(pagination_endpoint, page=page - 1) }}" class="admin-page-btn">Prev</a>
+        <a href="{{ page_url(page - 1) }}" class="admin-page-btn">Prev</a>
         {% else %}
         <span class="admin-page-btn disabled">Prev</span>
         {% endif %}
@@ -12,25 +28,39 @@
         {% set start = [1, page - 2]|max %}
         {% set end = [total_pages, page + 2]|min %}
         {% if start > 1 %}
-        <a href="{{ url_for(pagination_endpoint, page=1) }}" class="admin-page-btn">1</a>
+        <a href="{{ page_url(1) }}" class="admin-page-btn">1</a>
         {% if start > 2 %}<span class="admin-page-ellipsis">…</span>{% endif %}
         {% endif %}
         {% for p in range(start, end + 1) %}
         {% if p == page %}
         <span class="admin-page-btn active">{{ p }}</span>
         {% else %}
-        <a href="{{ url_for(pagination_endpoint, page=p) }}" class="admin-page-btn">{{ p }}</a>
+        <a href="{{ page_url(p) }}" class="admin-page-btn">{{ p }}</a>
         {% endif %}
         {% endfor %}
         {% if end < total_pages %}
         {% if end < total_pages - 1 %}<span class="admin-page-ellipsis">…</span>{% endif %}
-        <a href="{{ url_for(pagination_endpoint, page=total_pages) }}" class="admin-page-btn">{{ total_pages }}</a>
+        <a href="{{ page_url(total_pages) }}" class="admin-page-btn">{{ total_pages }}</a>
         {% endif %}
         {% endif %}
         {% if page < total_pages %}
-        <a href="{{ url_for(pagination_endpoint, page=page + 1) }}" class="admin-page-btn">Next</a>
+        <a href="{{ page_url(page + 1) }}" class="admin-page-btn">Next</a>
         {% else %}
         <span class="admin-page-btn disabled">Next</span>
         {% endif %}
     </div>
 </nav>
+<script>
+(function() {
+    var sel = document.getElementById('admin_per_page');
+    if (!sel) return;
+    sel.addEventListener('change', function() {
+        var params = new URLSearchParams(globalThis.location.search);
+        params.set('per_page', this.value);
+        params.set('page', '1');
+        var qs = params.toString();
+        globalThis.location.search = qs ? '?' + qs : '';
+    });
+})();
+</script>
+{% endif %}

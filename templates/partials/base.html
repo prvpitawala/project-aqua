@@ -244,11 +244,56 @@
         .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 0.875rem; color: var(--slate-800); }
         .form-group input { width: 100%; padding: 0.75rem 1rem; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 1rem; }
         .form-group input:focus { outline: none; border-color: var(--aqua-500); box-shadow: 0 0 0 3px var(--aqua-600-15); }
+        .password-field { position: relative; }
+        .password-field input { padding-right: 3rem; }
+        .password-toggle {
+            position: absolute;
+            right: 0.65rem;
+            top: 50%;
+            transform: translateY(-50%);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2rem;
+            height: 2rem;
+            padding: 0;
+            border: none;
+            border-radius: 8px;
+            background: transparent;
+            color: var(--slate-500);
+            cursor: pointer;
+            transition: color 0.2s, background 0.2s;
+        }
+        .password-toggle:hover { color: var(--aqua-600); background: rgba(6, 182, 212, 0.08); }
+        .password-toggle svg { width: 1.125rem; height: 1.125rem; }
+        .password-toggle .icon-hide { display: none; }
+        .password-toggle.is-visible .icon-show { display: none; }
+        .password-toggle.is-visible .icon-hide { display: block; }
         .modal-actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
         .modal-actions button { flex: 1; padding: 0.75rem; border-radius: 12px; font-size: 0.95rem; font-weight: 600; cursor: pointer; border: none; font-family: inherit; }
         .btn-signin { background: linear-gradient(135deg, var(--aqua-600), var(--aqua-500)); color: white; }
         .btn-cancel { background: #f1f5f9; color: var(--slate-600); }
         .error-msg { color: #b91c1c; font-size: 0.875rem; margin-top: 0.5rem; padding: 0.5rem; background: #fef2f2; border-radius: 8px; display: none; }
+        .alert-dismissible {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.75rem;
+        }
+        .alert-banner-text { flex: 1; min-width: 0; }
+        .alert-banner-close {
+            flex-shrink: 0;
+            border: none;
+            background: transparent;
+            color: inherit;
+            opacity: 0.65;
+            font-size: 1.25rem;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0 0.1rem;
+            margin: -0.05rem 0 0;
+        }
+        .alert-banner-close:hover { opacity: 1; }
         .btn-chat-bot {
             position: fixed;
             bottom: 1.5rem;
@@ -547,6 +592,66 @@
         .pagination-btn.active { background: linear-gradient(135deg, var(--aqua-600), var(--aqua-500)); color: white; border-color: transparent; }
         .pagination-btn.disabled { color: var(--slate-400); cursor: default; }
         .pagination-ellipsis { padding: 0 0.25rem; color: var(--slate-400); font-size: 0.875rem; }
+        .sidebar-filter-actions {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e2e8f0;
+        }
+        .filter-clear-btn {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            font-family: inherit;
+            color: var(--slate-600);
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: border-color 0.15s, color 0.15s, background 0.15s;
+        }
+        .filter-clear-btn:hover {
+            border-color: var(--aqua-400);
+            color: var(--aqua-600);
+            background: rgba(6, 182, 212, 0.06);
+        }
+        .filter-option {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .filter-option label {
+            margin-bottom: 0;
+        }
+        .catalog-empty-state {
+            padding: 3rem 1.5rem;
+            text-align: center;
+            background: #fff;
+            border: 1px dashed #cbd5e1;
+            border-radius: 12px;
+        }
+        .catalog-empty-title {
+            font-size: 1.125rem;
+            font-weight: 700;
+            color: var(--slate-800);
+            margin-bottom: 0.5rem;
+        }
+        .catalog-empty-text {
+            font-size: 0.9375rem;
+            color: var(--slate-500);
+            max-width: 28rem;
+            margin: 0 auto 1rem;
+            line-height: 1.5;
+        }
+        .catalog-empty-clear {
+            width: auto;
+            min-width: 10rem;
+            display: inline-block;
+        }
+        .catalog-empty-state + .products-grid {
+            margin-top: 1rem;
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
@@ -569,10 +674,12 @@
             {% if request.path.startswith('/admin') %}
             <a href="/" class="navbar-home-link">Home Page</a>
             {% endif %}
+            {% if not session.get('admin') %}
             <button type="button" class="navbar-cart-btn" onclick="AquaCart.open()" aria-label="Open cart">
             <span id="cartBadge" class="cart-badge" data-count="0" aria-hidden="true"></span>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 2a1 1 0 0 0-.9.6L2.2 9.4A1 1 0 0 0 3 11h1.4l1.8 9.2a1 1 0 0 0 1 .8h9.6a1 1 0 0 0 1-.8L18.6 11H21a1 1 0 0 0 .8-1.6L18.9 2.6A1 1 0 0 0 18 2H6zm3.2 9h5.6l-1.2 6H10.4L9.2 11z"/></svg>
             </button>
+            {% endif %}
         </div>
     </nav>
 
@@ -611,8 +718,20 @@
             <h2>Admin Sign In</h2>
             <form id="adminLoginForm" onsubmit="submitAdminLogin(event)">
                 <div class="form-group"><label for="adminUser">Username</label><input type="text" id="adminUser" name="username" placeholder="Enter username" required autocomplete="username"></div>
-                <div class="form-group"><label for="adminPass">Password</label><input type="password" id="adminPass" name="password" placeholder="Enter password" required autocomplete="current-password"></div>
-                <div id="loginError" class="error-msg"></div>
+                <div class="form-group">
+                    <label for="adminPass">Password</label>
+                    <div class="password-field">
+                        <input type="password" id="adminPass" name="password" placeholder="Enter password" required autocomplete="current-password">
+                        <button type="button" class="password-toggle" id="adminPassToggle" aria-label="Show password" aria-pressed="false">
+                            <svg class="icon-show" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <svg class="icon-hide" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="loginError" class="error-msg alert-dismissible" role="alert" style="display:none">
+                    <span class="alert-banner-text"></span>
+                    <button type="button" class="alert-banner-close" aria-label="Close notification">&times;</button>
+                </div>
                 <div class="modal-actions"><button type="button" class="btn-cancel" onclick="closeAdminPopup()">Cancel</button><button type="submit" class="btn-signin">Sign In</button></div>
             </form>
         </div>
@@ -645,12 +764,21 @@
     function toggleChatPanel(){var p=document.getElementById('chatPanel');var o=document.getElementById('chatOverlay');var open=p.classList.contains('open');if(open){p.classList.remove('open');o.classList.remove('show');}else{p.classList.add('open');o.classList.add('show');document.getElementById('chatInput').focus();}}
     function closeChatPanel(){document.getElementById('chatPanel').classList.remove('open');document.getElementById('chatOverlay').classList.remove('show');}
     function sendChatMessage(){var inp=document.getElementById('chatInput');var txt=inp.value.trim();if(!txt){return;}var msgs=document.getElementById('chatMessages');var userMsg=document.createElement('div');userMsg.className='chat-msg user';userMsg.textContent=txt;msgs.appendChild(userMsg);inp.value='';msgs.scrollTop=msgs.scrollHeight;var botMsg=document.createElement('div');botMsg.className='chat-msg bot';botMsg.textContent='Thanks for your message! How else can I assist you?';msgs.appendChild(botMsg);msgs.scrollTop=msgs.scrollHeight;}
-    function openAdminPopup(){var m=document.getElementById('adminModal');m.classList.add('show');document.getElementById('loginError').style.display='none';document.getElementById('adminUser').value='';document.getElementById('adminPass').value='';}
+    function resetAdminPasswordToggle(){var p=document.getElementById('adminPass');var t=document.getElementById('adminPassToggle');if(p){p.type='password';}if(t){t.classList.remove('is-visible');t.setAttribute('aria-label','Show password');t.setAttribute('aria-pressed','false');}}
+    function openAdminPopup(){var m=document.getElementById('adminModal');m.classList.add('show');document.getElementById('loginError').style.display='none';document.getElementById('adminUser').value='';document.getElementById('adminPass').value='';resetAdminPasswordToggle();}
     function closeAdminPopup(){document.getElementById('adminModal').classList.remove('show');}
     document.getElementById('adminModal').addEventListener('click',function(e){if(e.target===this)closeAdminPopup();});
+    (function(){var input=document.getElementById('adminPass');var toggle=document.getElementById('adminPassToggle');if(!input||!toggle)return;toggle.addEventListener('click',function(){var show=input.type==='password';input.type=show?'text':'password';toggle.classList.toggle('is-visible',show);toggle.setAttribute('aria-label',show?'Hide password':'Show password');toggle.setAttribute('aria-pressed',show?'true':'false');});})();
     document.getElementById('chatOverlay').addEventListener('click',closeChatPanel);
     if(globalThis.location.search.includes('open=signin')){openAdminPopup();history.replaceState({},'',globalThis.location.pathname);}
-    function submitAdminLogin(e){e.preventDefault();var f=e.target,d=new FormData(f);fetch('/admin/login',{method:'POST',body:d,headers:{'X-Requested-With':'XMLHttpRequest'}}).then(function(r){return r.json();}).then(function(data){if(data.success)globalThis.location.href=data.redirect||'/admin';else{var err=document.getElementById('loginError');err.textContent=data.error||'Invalid credentials';err.style.display='block';}}).catch(function(){document.getElementById('loginError').textContent='An error occurred';document.getElementById('loginError').style.display='block';});}
+    function showBannerError(el, message) {
+        if (!el) return;
+        var textEl = el.querySelector('.alert-banner-text');
+        if (textEl) textEl.textContent = message;
+        else el.textContent = message;
+        el.style.display = 'flex';
+    }
+    function submitAdminLogin(e){e.preventDefault();var f=e.target,d=new FormData(f);fetch('/admin/login',{method:'POST',body:d,headers:{'X-Requested-With':'XMLHttpRequest'}}).then(function(r){return r.json();}).then(function(data){if(data.success)globalThis.location.href=data.redirect||'/admin';else{showBannerError(document.getElementById('loginError'), data.error||'Invalid credentials');}}).catch(function(){showBannerError(document.getElementById('loginError'), 'An error occurred');});}
 
     (function(){
         var STORAGE_KEY = 'aqua_cart_v1';
@@ -922,6 +1050,17 @@
             }
         });
     })();
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.alert-banner-close');
+        if (!btn) return;
+        var banner = btn.closest('.alert-dismissible');
+        if (!banner) return;
+        if (banner.id === 'checkoutError' || banner.id === 'loginError') {
+            banner.style.display = 'none';
+            return;
+        }
+        banner.remove();
+    });
     </script>
     {% block extra_js %}{% endblock %}
 </body>

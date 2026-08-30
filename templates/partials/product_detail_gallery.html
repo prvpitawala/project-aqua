@@ -1,0 +1,45 @@
+<div class="detail-gallery">
+    <div class="detail-image">
+        {% if gallery_item.images %}
+        <img id="detailMainImage" src="{{ gallery_item.images[0].url }}" alt="{{ gallery_item.name }}">
+        {% else %}
+        <div class="detail-image-empty">No image</div>
+        {% endif %}
+    </div>
+    {% if gallery_item.images|length > 1 %}
+    <div class="detail-thumbs" role="tablist" aria-label="Product images">
+        {% for img in gallery_item.images %}
+        <button
+            type="button"
+            class="detail-thumb{{ ' active' if loop.first else '' }}"
+            data-src="{{ img.url }}"
+            role="tab"
+            aria-selected="{{ 'true' if loop.first else 'false' }}"
+            aria-label="View image {{ loop.index }}"
+        >
+            <img src="{{ img.url }}" alt="">
+        </button>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+<script>
+(function() {
+    var main = document.getElementById('detailMainImage');
+    var thumbs = document.querySelectorAll('.detail-thumb');
+    if (!main || !thumbs.length) return;
+    thumbs.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var src = this.dataset.src;
+            if (!src) return;
+            main.src = src;
+            thumbs.forEach(function(t) {
+                t.classList.remove('active');
+                t.setAttribute('aria-selected', 'false');
+            });
+            this.classList.add('active');
+            this.setAttribute('aria-selected', 'true');
+        });
+    });
+})();
+</script>

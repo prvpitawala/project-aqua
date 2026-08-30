@@ -1,4 +1,5 @@
 {% extends "partials/base.html" %}
+{% from 'partials/dismissible_alert.html' import dismissible %}
 
 {% block title %}Customer Orders - AquaStore Admin{% endblock %}
 
@@ -10,19 +11,9 @@
             <h1>Customer Orders</h1>
             <p>Orders placed through cart checkout</p>
         </div>
-        <div class="admin-toolbar">
-            <span class="admin-toolbar-label">Show</span>
-            <select id="per_page" class="admin-select" data-base-url="{{ url_for('admin_orders') }}">
-                {% for n in per_page_options %}
-                <option value="{{ n }}" {{ 'selected' if n == per_page else '' }}>{{ n }} / page</option>
-                {% endfor %}
-            </select>
-        </div>
     </div>
 
-    {% if notice %}
-    <div class="admin-alert admin-alert-{{ notice_type or 'success' }}">{{ notice }}</div>
-    {% endif %}
+    {{ dismissible(notice, notice_type or 'success') }}
 
     <div class="admin-stat-row">
         <div class="admin-stat-card">
@@ -51,7 +42,7 @@
         </div>
     </div>
 
-    {% if orders %}
+    {% if total > 0 %}
     <div class="admin-panel">
         <div class="admin-panel-head">
             <h2>Recent orders</h2>
@@ -115,7 +106,6 @@
                 </tbody>
             </table>
         </div>
-        {% set pagination_endpoint = 'admin_orders' %}
         {% set pagination_aria_label = 'Orders pagination' %}
         {% set item_label = 'order' + ('s' if total != 1 else '') %}
         {% include 'partials/admin_pagination_nav.html' %}
@@ -131,15 +121,4 @@
 </div>
 
 {% include 'partials/admin_ui_styles.html' %}
-{% endblock %}
-
-{% block extra_js %}
-<script>
-var perPageEl = document.getElementById('per_page');
-if (perPageEl) {
-    perPageEl.addEventListener('change', function() {
-        globalThis.location.href = this.dataset.baseUrl + '?per_page=' + this.value + '&page=1';
-    });
-}
-</script>
 {% endblock %}

@@ -119,6 +119,47 @@
         .form-group input::placeholder {
             color: #94a3b8;
         }
+        .password-field {
+            position: relative;
+        }
+        .password-field input {
+            padding-right: 3rem;
+        }
+        .password-toggle {
+            position: absolute;
+            right: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2rem;
+            height: 2rem;
+            padding: 0;
+            border: none;
+            border-radius: 8px;
+            background: transparent;
+            color: var(--slate-600);
+            cursor: pointer;
+            transition: color 0.2s, background 0.2s;
+        }
+        .password-toggle:hover {
+            color: var(--aqua-600);
+            background: rgba(6, 182, 212, 0.08);
+        }
+        .password-toggle svg {
+            width: 1.25rem;
+            height: 1.25rem;
+        }
+        .password-toggle .icon-hide {
+            display: none;
+        }
+        .password-toggle.is-visible .icon-show {
+            display: none;
+        }
+        .password-toggle.is-visible .icon-hide {
+            display: block;
+        }
         .form-actions {
             display: flex;
             gap: 0.75rem;
@@ -166,6 +207,26 @@
             border-radius: 8px;
             display: none;
         }
+        .alert-dismissible {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.75rem;
+        }
+        .alert-banner-text { flex: 1; min-width: 0; }
+        .alert-banner-close {
+            flex-shrink: 0;
+            border: none;
+            background: transparent;
+            color: inherit;
+            opacity: 0.65;
+            font-size: 1.25rem;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0 0.1rem;
+            margin: -0.05rem 0 0;
+        }
+        .alert-banner-close:hover { opacity: 1; }
         .back-link {
             margin-top: 1.5rem;
             text-align: center;
@@ -200,9 +261,18 @@
                 </div>
                 <div class="form-group">
                     <label for="adminPass">Password</label>
-                    <input type="password" id="adminPass" name="password" placeholder="Enter your password" required autocomplete="current-password">
+                    <div class="password-field">
+                        <input type="password" id="adminPass" name="password" placeholder="Enter your password" required autocomplete="current-password">
+                        <button type="button" class="password-toggle" id="adminPassToggle" aria-label="Show password" aria-pressed="false">
+                            <svg class="icon-show" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <svg class="icon-hide" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/></svg>
+                        </button>
+                    </div>
                 </div>
-                <div id="loginError" class="error-msg"></div>
+                <div id="loginError" class="error-msg alert-dismissible" role="alert" style="display:none">
+                    <span class="alert-banner-text"></span>
+                    <button type="button" class="alert-banner-close" aria-label="Close notification">&times;</button>
+                </div>
                 <div class="form-actions">
                     <a href="/" class="btn-cancel">Cancel</a>
                     <button type="submit" class="btn-signin">Sign In</button>
@@ -215,6 +285,27 @@
     </div>
 
     <script>
+        (function() {
+            var input = document.getElementById('adminPass');
+            var toggle = document.getElementById('adminPassToggle');
+            if (!input || !toggle) return;
+            toggle.addEventListener('click', function() {
+                var show = input.type === 'password';
+                input.type = show ? 'text' : 'password';
+                toggle.classList.toggle('is-visible', show);
+                toggle.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+                toggle.setAttribute('aria-pressed', show ? 'true' : 'false');
+            });
+        })();
+
+        function showBannerError(el, message) {
+            if (!el) return;
+            var textEl = el.querySelector('.alert-banner-text');
+            if (textEl) textEl.textContent = message;
+            else el.textContent = message;
+            el.style.display = 'flex';
+        }
+
         function submitAdminLogin(e) {
             e.preventDefault();
             const form = e.target;
@@ -229,16 +320,25 @@
                 if (data.success) {
                     globalThis.location.href = data.redirect || '/admin';
                 } else {
-                    const err = document.getElementById('loginError');
-                    err.textContent = data.error || 'Invalid credentials';
-                    err.style.display = 'block';
+                    showBannerError(document.getElementById('loginError'), data.error || 'Invalid credentials');
                 }
             })
             .catch(() => {
-                document.getElementById('loginError').textContent = 'An error occurred';
-                document.getElementById('loginError').style.display = 'block';
+                showBannerError(document.getElementById('loginError'), 'An error occurred');
             });
         }
+
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.alert-banner-close');
+            if (!btn) return;
+            var banner = btn.closest('.alert-dismissible');
+            if (!banner) return;
+            if (banner.id === 'loginError') {
+                banner.style.display = 'none';
+                return;
+            }
+            banner.remove();
+        });
     </script>
 </body>
 </html>

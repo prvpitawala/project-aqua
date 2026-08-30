@@ -1,4 +1,5 @@
 {% extends "partials/base.html" %}
+{% from 'partials/dismissible_alert.html' import dismissible %}
 
 {% block title %}Contact Messages - AquaStore Admin{% endblock %}
 
@@ -10,19 +11,9 @@
             <h1>Contact Messages</h1>
             <p>Inquiries submitted through the public contact form</p>
         </div>
-        <div class="admin-toolbar">
-            <span class="admin-toolbar-label">Show</span>
-            <select id="per_page" class="admin-select" data-base-url="{{ url_for('admin_messages') }}">
-                {% for n in per_page_options %}
-                <option value="{{ n }}" {{ 'selected' if n == per_page else '' }}>{{ n }} / page</option>
-                {% endfor %}
-            </select>
-        </div>
     </div>
 
-    {% if notice %}
-    <div class="admin-alert admin-alert-{{ notice_type or 'success' }}">{{ notice }}</div>
-    {% endif %}
+    {{ dismissible(notice, notice_type or 'success') }}
 
     <div class="admin-stat-row">
         <div class="admin-stat-card">
@@ -43,7 +34,7 @@
         </div>
     </div>
 
-    {% if messages %}
+    {% if total > 0 %}
     <div class="admin-panel">
         <div class="admin-panel-head">
             <h2>Inbox</h2>
@@ -78,22 +69,33 @@
                         <td class="admin-cell-preview" title="{{ msg.message }}">{{ msg.message }}</td>
                         <td class="admin-cell-date">{{ msg.created_at.strftime('%b %d, %Y · %H:%M') if msg.created_at else '—' }}</td>
                         <td>
-                            <button
-                                type="button"
-                                class="admin-btn msg-reply-btn"
-                                data-id="{{ msg.id }}"
-                                data-name="{{ msg.name|e }}"
-                                data-email="{{ msg.email|e }}"
-                                data-subject="{{ msg.subject|e }}"
-                                data-message="{{ msg.message|e }}"
-                            >Reply</button>
+                            <div class="admin-row-actions">
+                                <button
+                                    type="button"
+                                    class="admin-btn msg-view-btn"
+                                    data-id="{{ msg.id }}"
+                                    data-name="{{ msg.name|e }}"
+                                    data-email="{{ msg.email|e }}"
+                                    data-subject="{{ msg.subject|e }}"
+                                    data-message="{{ msg.message|e }}"
+                                    data-date="{{ msg.created_at.strftime('%b %d, %Y · %H:%M') if msg.created_at else '' }}"
+                                >View</button>
+                                <button
+                                    type="button"
+                                    class="admin-btn msg-reply-btn"
+                                    data-id="{{ msg.id }}"
+                                    data-name="{{ msg.name|e }}"
+                                    data-email="{{ msg.email|e }}"
+                                    data-subject="{{ msg.subject|e }}"
+                                    data-message="{{ msg.message|e }}"
+                                >Reply</button>
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-        {% set pagination_endpoint = 'admin_messages' %}
         {% set pagination_aria_label = 'Messages pagination' %}
         {% set item_label = 'message' + ('s' if total != 1 else '') %}
         {% include 'partials/admin_pagination_nav.html' %}
@@ -106,6 +108,43 @@
         <a href="{{ url_for('contact') }}" class="admin-btn">View contact form</a>
     </div>
     {% endif %}
+</div>
+
+<div id="viewModal" class="msg-reply-modal" aria-hidden="true">
+    <div class="msg-reply-overlay" data-close-view></div>
+    <div class="msg-reply-dialog" role="dialog" aria-modal="true" aria-labelledby="viewModalTitle">
+        <div class="msg-reply-header">
+            <h2 id="viewModalTitle">Message details</h2>
+            <button type="button" class="msg-reply-close" data-close-view aria-label="Close">&times;</button>
+        </div>
+        <div class="msg-reply-body">
+            <div class="msg-view-meta">
+                <div class="msg-view-row">
+                    <span class="msg-view-label">From</span>
+                    <div>
+                        <div id="viewFromName" class="msg-view-value"></div>
+                        <a id="viewFromEmail" class="admin-link admin-cell-muted" href="#"></a>
+                    </div>
+                </div>
+                <div class="msg-view-row">
+                    <span class="msg-view-label">Received</span>
+                    <div id="viewReceivedAt" class="msg-view-value"></div>
+                </div>
+                <div class="msg-view-row">
+                    <span class="msg-view-label">Subject</span>
+                    <div id="viewSubject" class="msg-view-value"></div>
+                </div>
+            </div>
+            <div class="msg-view-message-wrap">
+                <div class="msg-reply-original-label">Message</div>
+                <div id="viewMessageBody" class="msg-view-message"></div>
+            </div>
+        </div>
+        <div class="msg-reply-footer">
+            <button type="button" class="admin-btn" data-close-view>Close</button>
+            <button type="button" class="admin-btn-primary" id="viewReplyBtn">Reply</button>
+        </div>
+    </div>
 </div>
 
 <div id="replyModal" class="msg-reply-modal" aria-hidden="true">
@@ -279,50 +318,139 @@
     border-top: 1px solid #e2e8f0;
     background: #fafbfc;
 }
+.admin-row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    justify-content: flex-end;
+}
+.msg-view-meta {
+    display: grid;
+    gap: 0.85rem;
+    margin-bottom: 1rem;
+}
+.msg-view-row {
+    display: grid;
+    grid-template-columns: 5.5rem 1fr;
+    gap: 0.75rem;
+    align-items: start;
+}
+.msg-view-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--slate-500);
+    padding-top: 0.1rem;
+}
+.msg-view-value {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--slate-800);
+    line-height: 1.45;
+}
+.msg-view-message-wrap {
+    padding: 0.9rem 1rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+}
+.msg-view-message {
+    font-size: 0.9375rem;
+    color: var(--slate-700);
+    line-height: 1.6;
+    white-space: pre-line;
+}
 </style>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-var perPageEl = document.getElementById('per_page');
-if (perPageEl) {
-    perPageEl.addEventListener('change', function() {
-        globalThis.location.href = this.dataset.baseUrl + '?per_page=' + this.value + '&page=1';
-    });
-}
-
 (function() {
-    var modal = document.getElementById('replyModal');
+    var viewModal = document.getElementById('viewModal');
+    var replyModal = document.getElementById('replyModal');
     var form = document.getElementById('replyForm');
-    if (!modal || !form) return;
+    var viewReplyBtn = document.getElementById('viewReplyBtn');
+    var activeMessageBtn = null;
+    if (!replyModal || !form) return;
+
+    function messageDataFromBtn(btn) {
+        return {
+            id: btn.dataset.id || '',
+            name: btn.dataset.name || '',
+            email: btn.dataset.email || '',
+            subject: btn.dataset.subject || '',
+            message: btn.dataset.message || '',
+            date: btn.dataset.date || ''
+        };
+    }
 
     function openReply(btn) {
-        var subject = btn.dataset.subject || '';
-        document.getElementById('replyToName').textContent = btn.dataset.name || '';
-        document.getElementById('replyToEmail').textContent = btn.dataset.email || '';
+        var data = messageDataFromBtn(btn);
+        var subject = data.subject;
+        document.getElementById('replyToName').textContent = data.name;
+        document.getElementById('replyToEmail').textContent = data.email;
         document.getElementById('replyOriginalSubject').textContent = subject;
-        document.getElementById('replyOriginalMessage').textContent = btn.dataset.message || '';
+        document.getElementById('replyOriginalMessage').textContent = data.message;
         document.getElementById('reply_subject').value = subject.startsWith('Re:') ? subject : 'Re: ' + subject;
         document.getElementById('reply_body').value = '';
-        form.action = '/admin/messages/' + btn.dataset.id + '/reply';
-        modal.classList.add('open');
-        modal.setAttribute('aria-hidden', 'false');
+        form.action = '/admin/messages/' + data.id + '/reply';
+        replyModal.classList.add('open');
+        replyModal.setAttribute('aria-hidden', 'false');
         document.getElementById('reply_body').focus();
     }
 
     function closeReply() {
-        modal.classList.remove('open');
-        modal.setAttribute('aria-hidden', 'true');
+        replyModal.classList.remove('open');
+        replyModal.setAttribute('aria-hidden', 'true');
     }
 
+    function openView(btn) {
+        activeMessageBtn = btn;
+        var data = messageDataFromBtn(btn);
+        document.getElementById('viewFromName').textContent = data.name;
+        var emailLink = document.getElementById('viewFromEmail');
+        emailLink.textContent = data.email;
+        emailLink.href = data.email ? 'mailto:' + data.email : '#';
+        document.getElementById('viewReceivedAt').textContent = data.date || '—';
+        document.getElementById('viewSubject').textContent = data.subject;
+        document.getElementById('viewMessageBody').textContent = data.message;
+        if (viewModal) {
+            viewModal.classList.add('open');
+            viewModal.setAttribute('aria-hidden', 'false');
+        }
+    }
+
+    function closeView() {
+        if (!viewModal) return;
+        viewModal.classList.remove('open');
+        viewModal.setAttribute('aria-hidden', 'true');
+        activeMessageBtn = null;
+    }
+
+    document.querySelectorAll('.msg-view-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() { openView(btn); });
+    });
     document.querySelectorAll('.msg-reply-btn').forEach(function(btn) {
         btn.addEventListener('click', function() { openReply(btn); });
     });
     document.querySelectorAll('[data-close-reply]').forEach(function(el) {
         el.addEventListener('click', closeReply);
     });
+    document.querySelectorAll('[data-close-view]').forEach(function(el) {
+        el.addEventListener('click', closeView);
+    });
+    if (viewReplyBtn) {
+        viewReplyBtn.addEventListener('click', function() {
+            if (!activeMessageBtn) return;
+            closeView();
+            openReply(activeMessageBtn);
+        });
+    }
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && modal.classList.contains('open')) closeReply();
+        if (e.key !== 'Escape') return;
+        if (viewModal && viewModal.classList.contains('open')) closeView();
+        else if (replyModal.classList.contains('open')) closeReply();
     });
 })();
 </script>
