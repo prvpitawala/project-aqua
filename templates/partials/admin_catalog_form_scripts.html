@@ -11,15 +11,112 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    var indexBtn = document.getElementById('catalogIndexBtn');
+    var ragStatus = document.getElementById('catalogRagStatus');
+    var ragHint = document.getElementById('catalogRagHint');
+    var fileList = document.getElementById('catalogFileList');
+    var indexingOverlay = document.getElementById('catalogSaveIndexingOverlay');
+
+    function hasSavedCatalogFiles() {
+        return !!(fileList && fileList.querySelector('.catalog-file-item--saved:not([hidden])'));
+    }
+
+    function hasPendingCatalogFiles() {
+        return !!(fileList && fileList.querySelector('.catalog-file-item--pending:not([hidden])'));
+    }
+
+    function updateIndexButtonState() {
+        if (!indexBtn) return;
+        var canIndex = !!(indexBtn.dataset.productType && indexBtn.dataset.productId && hasSavedCatalogFiles());
+        indexBtn.disabled = !canIndex;
+        if (!indexBtn.dataset.productType || !indexBtn.dataset.productId) {
+            indexBtn.title = 'Save the product first, then you can index documents';
+        } else if (hasPendingCatalogFiles() && !hasSavedCatalogFiles()) {
+            indexBtn.title = 'Click Save Changes — documents are indexed automatically on save';
+        } else if (!hasSavedCatalogFiles()) {
+            indexBtn.title = 'Add a document and click Save Changes';
+        } else {
+            indexBtn.title = 'Re-index saved documents (indexing also runs automatically on save)';
+        }
+        if (ragHint) {
+            if (hasPendingCatalogFiles() && !hasSavedCatalogFiles()) {
+                ragHint.innerHTML = 'Your file will be saved and indexed when you click <strong>Save Changes</strong>.';
+            } else {
+                ragHint.innerHTML = 'Upload plain-text files (.txt, .csv, .md) and click <strong>Save Changes</strong> — documents are saved and indexed automatically.';
+            }
+        }
+    }
+
+    function documentsWillChangeOnSave() {
+        return hasPendingCatalogFiles();
+    }
+
+    function showSavingIndexingNotice(catalogForm) {
+        if (indexingOverlay) {
+            indexingOverlay.hidden = false;
+            indexingOverlay.setAttribute('aria-hidden', 'false');
+        }
+        if (ragStatus) {
+            ragStatus.className = 'catalog-rag-status is-indexing';
+            ragStatus.textContent = 'Saving and indexing documents…';
+        }
+        if (catalogForm) {
+            var saveBtn = catalogForm.querySelector('.btn-form-primary');
+            if (saveBtn) saveBtn.disabled = true;
+        }
+    }
+
+    if (indexBtn && ragStatus) {
+        updateIndexButtonState();
+        indexBtn.addEventListener('click', function() {
+            var productType = indexBtn.dataset.productType;
+            var productId = indexBtn.dataset.productId;
+            var indexUrl = indexBtn.dataset.indexUrl;
+            if (!productType || !productId || !indexUrl) return;
+
+            indexBtn.disabled = true;
+            ragStatus.className = 'catalog-rag-status is-indexing';
+            ragStatus.textContent = 'Indexing documents...';
+
+            fetch(indexUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({
+                    product_type: productType,
+                    product_id: parseInt(productId, 10),
+                }),
+            })
+            .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
+            .then(function(result) {
+                if (result.ok && result.data.success) {
+                    ragStatus.className = 'catalog-rag-status is-success';
+                    var count = result.data.chunk_count || 0;
+                    ragStatus.textContent = 'Indexed ' + count + ' chunk' + (count === 1 ? '' : 's') + '.';
+                } else {
+                    ragStatus.className = 'catalog-rag-status is-error';
+                    ragStatus.textContent = (result.data && result.data.error) || 'Indexing failed.';
+                }
+            })
+            .catch(function() {
+                ragStatus.className = 'catalog-rag-status is-error';
+                ragStatus.textContent = 'Indexing failed. Please try again.';
+            })
+            .finally(function() {
+                updateIndexButtonState();
+            });
+        });
+    }
+
     var fileInput = document.getElementById('catalogFileInput');
     var fileDrop = document.getElementById('catalogFileDrop');
-    var fileList = document.getElementById('catalogFileList');
-    var deleteInputs = document.getElementById('catalogFileDeleteInputs');
     var catalogForm = fileInput ? fileInput.closest('form') : null;
     if (!fileInput || !fileDrop || !fileList || !catalogForm) return;
 
     var pendingFiles = [];
-    var allowedExt = ['.txt', '.csv', '.md', '.pdf', '.doc', '.docx'];
+    var allowedExt = ['.txt', '.csv', '.md'];
 
     function isAllowedFile(file) {
         if (!file || !file.name) return false;
@@ -82,6 +179,7 @@ document.addEventListener('DOMContentLoaded', function() {
             '<button type="button" class="catalog-file-remove" aria-label="Remove ' + file.name + '">Remove</button>';
         fileList.appendChild(li);
         updateListVisibility();
+        updateIndexButtonState();
     }
 
     function addPendingFiles(fileListLike) {
@@ -122,21 +220,68 @@ document.addEventListener('DOMContentLoaded', function() {
         syncFileInput();
     });
 
+    function updateRagStatusFromIndexResult(chunkCount, warning) {
+        if (!ragStatus) return;
+        if (warning) {
+            ragStatus.className = 'catalog-rag-status is-error';
+            ragStatus.textContent = warning;
+            return;
+        }
+        if (!chunkCount) {
+            ragStatus.className = 'catalog-rag-status';
+            ragStatus.textContent = 'Not indexed yet.';
+            return;
+        }
+        ragStatus.className = 'catalog-rag-status is-success';
+        var count = chunkCount || 0;
+        ragStatus.textContent = 'Indexed ' + count + ' chunk' + (count === 1 ? '' : 's') + '.';
+    }
+
     fileList.addEventListener('click', function(e) {
         var btn = e.target.closest('.catalog-file-remove');
         if (!btn) return;
 
-        var existingId = btn.getAttribute('data-existing-id');
-        if (existingId) {
+        var deleteUrl = btn.getAttribute('data-delete-url');
+        if (deleteUrl) {
+            e.preventDefault();
             var li = btn.closest('.catalog-file-item');
-            if (!li || li.hidden) return;
-            var hidden = document.createElement('input');
-            hidden.type = 'hidden';
-            hidden.name = 'delete_file_ids[]';
-            hidden.value = existingId;
-            deleteInputs.appendChild(hidden);
-            li.hidden = true;
-            updateListVisibility();
+            if (!li || li.classList.contains('catalog-file-item--removing')) return;
+
+            btn.disabled = true;
+            li.classList.add('catalog-file-item--removing');
+            if (ragStatus) {
+                ragStatus.className = 'catalog-rag-status is-indexing';
+                ragStatus.textContent = 'Deleting and updating index…';
+            }
+
+            fetch(deleteUrl, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            })
+            .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
+            .then(function(result) {
+                if (result.ok && result.data.success) {
+                    li.remove();
+                    updateListVisibility();
+                    updateRagStatusFromIndexResult(result.data.chunk_count, result.data.warning);
+                    updateIndexButtonState();
+                    return;
+                }
+                li.classList.remove('catalog-file-item--removing');
+                btn.disabled = false;
+                if (ragStatus) {
+                    ragStatus.className = 'catalog-rag-status is-error';
+                    ragStatus.textContent = (result.data && result.data.error) || 'Could not delete file.';
+                }
+            })
+            .catch(function() {
+                li.classList.remove('catalog-file-item--removing');
+                btn.disabled = false;
+                if (ragStatus) {
+                    ragStatus.className = 'catalog-rag-status is-error';
+                    ragStatus.textContent = 'Could not delete file. Please try again.';
+                }
+            });
             return;
         }
 
@@ -149,10 +294,14 @@ document.addEventListener('DOMContentLoaded', function() {
         pendingItem.remove();
         syncFileInput();
         updateListVisibility();
+        updateIndexButtonState();
     });
 
     catalogForm.addEventListener('submit', function() {
         syncFileInput();
+        if (documentsWillChangeOnSave()) {
+            showSavingIndexingNotice(catalogForm);
+        }
     });
 });
 

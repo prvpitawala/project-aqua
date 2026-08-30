@@ -746,6 +746,162 @@ def delete_product_files(product_type, product_id, file_ids):
         return 0
 
 
+def ensure_product_rag_chunks_table():
+    """Create product_rag_chunks table if it does not exist yet."""
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                '''
+                CREATE TABLE IF NOT EXISTS product_rag_chunks (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    product_type VARCHAR(20) NOT NULL,
+                    product_id INT NOT NULL,
+                    file_id INT NOT NULL,
+                    chunk_index INT NOT NULL,
+                    content TEXT NOT NULL,
+                    embedding JSON NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_product (product_type, product_id),
+                    INDEX idx_file (file_id)
+                )
+                '''
+            )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
+def get_product_files_with_data(product_type, product_id):
+    """Return all document files for a product including blob data."""
+    ensure_product_files_table()
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                '''
+                SELECT id, file_name, file_type, file_size, file_data
+                FROM product_files
+                WHERE product_type = %s AND product_id = %s
+                ORDER BY id ASC
+                ''',
+                (product_type, product_id),
+            )
+            rows = cur.fetchall()
+        conn.close()
+        return rows or []
+    except Exception:
+        return []
+
+
+def delete_rag_chunks_for_product(product_type, product_id):
+    """Remove all RAG chunks for a product. Returns number deleted."""
+    ensure_product_rag_chunks_table()
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                'DELETE FROM product_rag_chunks WHERE product_type = %s AND product_id = %s',
+                (product_type, product_id),
+            )
+            deleted = cur.rowcount
+        conn.commit()
+        conn.close()
+        return deleted
+    except Exception:
+        return 0
+
+
+def insert_rag_chunks(rows):
+    """Insert RAG chunk rows. Each dict: product_type, product_id, file_id, chunk_index, content, embedding (list)."""
+    if not rows:
+        return 0
+    import json
+    ensure_product_rag_chunks_table()
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            for row in rows:
+                cur.execute(
+                    '''
+                    INSERT INTO product_rag_chunks (
+                        product_type, product_id, file_id, chunk_index, content, embedding
+                    ) VALUES (%s, %s, %s, %s, %s, %s)
+                    ''',
+                    (
+                        row['product_type'],
+                        row['product_id'],
+                        row['file_id'],
+                        row['chunk_index'],
+                        row['content'],
+                        json.dumps(row['embedding']),
+                    ),
+                )
+        conn.commit()
+        conn.close()
+        return len(rows)
+    except Exception:
+        return 0
+
+
+def get_rag_chunks_for_product(product_type, product_id):
+    """Return all RAG chunks for a product with parsed embeddings."""
+    import json
+    ensure_product_rag_chunks_table()
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                '''
+                SELECT id, file_id, chunk_index, content, embedding
+                FROM product_rag_chunks
+                WHERE product_type = %s AND product_id = %s
+                ORDER BY file_id ASC, chunk_index ASC
+                ''',
+                (product_type, product_id),
+            )
+            rows = cur.fetchall()
+        conn.close()
+        result = []
+        for row in rows or []:
+            item = dict(row)
+            emb = item.get('embedding')
+            if isinstance(emb, str):
+                item['embedding'] = json.loads(emb)
+            result.append(item)
+        return result
+    except Exception:
+        return []
+
+
+def get_rag_index_meta(product_type, product_id):
+    """Return chunk count and last indexed time for a product."""
+    ensure_product_rag_chunks_table()
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                '''
+                SELECT COUNT(*) AS chunk_count, MAX(created_at) AS indexed_at
+                FROM product_rag_chunks
+                WHERE product_type = %s AND product_id = %s
+                ''',
+                (product_type, product_id),
+            )
+            row = cur.fetchone()
+        conn.close()
+        if not row:
+            return {'chunk_count': 0, 'indexed_at': None}
+        return {
+            'chunk_count': int(row.get('chunk_count') or 0),
+            'indexed_at': row.get('indexed_at'),
+        }
+    except Exception:
+        return {'chunk_count': 0, 'indexed_at': None}
+
+
 def ensure_orders_tables():
     """Create orders tables if they do not exist yet."""
     try:

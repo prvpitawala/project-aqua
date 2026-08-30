@@ -3,7 +3,7 @@
            id="catalogFileInput"
            name="catalog_documents[]"
            multiple
-           accept=".txt,.csv,.md,.pdf,.doc,.docx,text/plain,text/csv,text/markdown,application/pdf"
+           accept=".txt,.csv,.md,text/plain,text/csv,text/markdown"
            class="catalog-file-input"
            hidden>
     <button type="button" class="catalog-file-drop" id="catalogFileDrop" aria-label="Add document files">
@@ -15,7 +15,7 @@
                 <line x1="9" y1="15" x2="15" y2="15"/>
             </svg>
             <span class="catalog-file-drop-title">Drag and drop text files here</span>
-            <span class="catalog-file-drop-hint">or click to browse · .txt, .csv, .md, .pdf, .doc, .docx</span>
+            <span class="catalog-file-drop-hint">or click to browse · .txt, .csv, .md only</span>
         </div>
     </button>
     <ul class="catalog-file-list{% if not catalog_files %} catalog-file-list--empty{% endif %}" id="catalogFileList">
@@ -31,7 +31,11 @@
                 <a href="{{ url_for('serve_catalog_file', id=f.id) }}" class="catalog-file-name">{{ f.file_name }}</a>
                 <span class="catalog-file-size">{{ f.file_size | filesizeformat }}</span>
             </div>
-            <button type="button" class="catalog-file-remove" data-existing-id="{{ f.id }}" aria-label="Remove {{ f.file_name }}">Remove</button>
+            <button type="button"
+                    class="catalog-file-remove"
+                    data-existing-id="{{ f.id }}"
+                    data-delete-url="{{ url_for('admin_delete_catalog_file', id=f.id) }}"
+                    aria-label="Remove {{ f.file_name }}">Remove</button>
         </li>
         {% endfor %}
     </ul>

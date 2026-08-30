@@ -21,11 +21,10 @@ CATALOG_TABLE_TYPES = {
     'tools': 'tool',
     'foods': 'food',
 }
-ALLOWED_CATALOG_DOC_EXTENSIONS = {'.txt', '.csv', '.md', '.pdf', '.doc', '.docx'}
+CATALOG_TYPE_TO_TABLE = {value: key for key, value in CATALOG_TABLE_TYPES.items()}
+ALLOWED_CATALOG_DOC_EXTENSIONS = {'.txt', '.csv', '.md'}
 ALLOWED_CATALOG_DOC_MIMES = {
-    'text/plain', 'text/csv', 'text/markdown', 'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/plain', 'text/csv', 'text/markdown',
 }
 HOME_TESTIMONIALS = (
     {
@@ -752,22 +751,32 @@ def _catalog_files_for(table, item_id=None):
     return get_product_files(CATALOG_TABLE_TYPES[table], item_id)
 
 
+def _catalog_rag_meta(table, item_id=None):
+    if not item_id:
+        return {'chunk_count': 0, 'indexed_at': None}
+    from models import get_rag_index_meta
+    return get_rag_index_meta(CATALOG_TABLE_TYPES[table], item_id)
+
+
 def _process_catalog_file_changes(table, item_id):
-    """Apply document uploads and deletions for a catalog product."""
+    """Apply document uploads and deletions. Returns (uploaded_count, deleted_count)."""
     from models import add_product_file, delete_product_files
     from werkzeug.utils import secure_filename
 
     product_type = CATALOG_TABLE_TYPES[table]
     delete_ids = []
-    for raw_id in request.form.getlist('delete_file_ids'):
+    for raw_id in request.form.getlist('delete_file_ids[]') or request.form.getlist('delete_file_ids'):
         try:
             delete_ids.append(int(raw_id))
         except (TypeError, ValueError):
             pass
+    deleted_count = 0
     if delete_ids:
-        delete_product_files(product_type, item_id, delete_ids)
+        deleted_count = delete_product_files(product_type, item_id, delete_ids)
 
-    for upload in request.files.getlist('catalog_documents'):
+    uploaded_count = 0
+    uploads = request.files.getlist('catalog_documents[]') or request.files.getlist('catalog_documents')
+    for upload in uploads:
         if not upload or not upload.filename:
             continue
         filename = secure_filename(upload.filename) or 'document.txt'
@@ -778,6 +787,47 @@ def _process_catalog_file_changes(table, item_id):
             continue
         mime = (upload.content_type or 'application/octet-stream')[:100]
         add_product_file(product_type, item_id, filename, data, mime, len(data))
+        uploaded_count += 1
+    return uploaded_count, deleted_count
+
+
+def _auto_index_product_rag(table, item_id):
+    """Rebuild RAG index after document changes. Returns (chunk_count, error_message)."""
+    from models import delete_rag_chunks_for_product, get_product_files
+    from rag_service import index_product
+
+    product_type = CATALOG_TABLE_TYPES[table]
+    if not get_product_files(product_type, item_id):
+        delete_rag_chunks_for_product(product_type, item_id)
+        return 0, None
+
+    chunk_count, error = index_product(product_type, item_id)
+    if error:
+        return None, error
+    return chunk_count, None
+
+
+def _flash_catalog_save_message(item_label, action, table, item_id, uploaded_count, deleted_count):
+    """Flash success/error after save; auto-index when documents changed."""
+    docs_changed = uploaded_count > 0 or deleted_count > 0
+    if not docs_changed:
+        flash(f'{item_label} {action} successfully.', 'success')
+        return
+
+    chunk_count, index_error = _auto_index_product_rag(table, item_id)
+    if index_error:
+        flash(
+            f'{item_label} {action}. Documents saved but indexing failed: {index_error}',
+            'error',
+        )
+    elif chunk_count == 0:
+        flash(f'{item_label} {action}. Documents removed — search index cleared.', 'success')
+    else:
+        plural = 's' if chunk_count != 1 else ''
+        flash(
+            f'{item_label} {action}. Documents saved and indexed ({chunk_count} chunk{plural}).',
+            'success',
+        )
 
 
 def _get_flashed_notice(default_type='success'):
@@ -876,9 +926,9 @@ def _save_plant_form(item_id=None):
             merged['light_condition'] = form_data.get('light_condition') or ''
             return merged, 'Failed to update plant.', 'error'
         _update_item_images('plants', item_id, images)
-        _process_catalog_file_changes('plants', item_id)
-        flash('Plant updated successfully.', 'success')
-        return redirect(url_for('admin_plants'))
+        uploaded_count, deleted_count = _process_catalog_file_changes('plants', item_id)
+        _flash_catalog_save_message('Plant', 'updated', 'plants', item_id, uploaded_count, deleted_count)
+        return redirect(url_for('admin_plants_edit', id=item_id))
     new_id, err = add_plant(
         form_data['name'], form_data['price'], form_data['category'], form_data['description'],
         images=images, weight=form_data['weight'], in_stock=form_data['in_stock'],
@@ -886,9 +936,9 @@ def _save_plant_form(item_id=None):
         light_condition=form_data['light_condition'],
     )
     if new_id:
-        _process_catalog_file_changes('plants', new_id)
-        flash('Plant added successfully.', 'success')
-        return redirect(url_for('admin_plants'))
+        uploaded_count, deleted_count = _process_catalog_file_changes('plants', new_id)
+        _flash_catalog_save_message('Plant', 'added', 'plants', new_id, uploaded_count, deleted_count)
+        return redirect(url_for('admin_plants_edit', id=new_id))
     fail_msg = f'Failed to add plant: {err}' if err else 'Failed to add plant. Check database connection.'
     item = dict(_blank_catalog_item(), **form_data)
     item['care_level'] = form_data.get('care_level') or ''
@@ -942,6 +992,8 @@ def admin_plants_edit(id):
                 message=message,
                 message_type=message_type,
                 catalog_files=_catalog_files_for('plants', id),
+                rag_index_meta=_catalog_rag_meta('plants', id),
+                rag_product_type='plant',
             )
         return result
     return render_template(
@@ -950,6 +1002,8 @@ def admin_plants_edit(id):
         is_edit=True,
         form_action=url_for('admin_plants_edit', id=id),
         catalog_files=_catalog_files_for('plants', id),
+        rag_index_meta=_catalog_rag_meta('plants', id),
+        rag_product_type='plant',
     )
 
 
@@ -960,7 +1014,7 @@ def admin_plants_delete(id):
     return _admin_delete_product('plants', id, get_plant_by_id, url_for('admin_plants'), 'Plant')
 
 
-def _save_tool_food_form(table, add_fn, update_fn, list_route, edit_template, item_label, item_id=None):
+def _save_tool_food_form(table, add_fn, update_fn, list_route, edit_route, edit_template, item_label, item_id=None):
     """Process tool/food create/edit form."""
     from models import _update_item_images
     form_data = _parse_catalog_form_fields()
@@ -978,17 +1032,17 @@ def _save_tool_food_form(table, add_fn, update_fn, list_route, edit_template, it
             merged['id'] = item_id
             return merged, f'Failed to update {table[:-1]}.', 'error'
         _update_item_images(table, item_id, images)
-        _process_catalog_file_changes(table, item_id)
-        flash(f'{item_label} updated successfully.', 'success')
-        return redirect(list_route)
+        uploaded_count, deleted_count = _process_catalog_file_changes(table, item_id)
+        _flash_catalog_save_message(item_label, 'updated', table, item_id, uploaded_count, deleted_count)
+        return redirect(url_for(edit_route, id=item_id))
     new_id, err = add_fn(
         plant_fields['name'], plant_fields['price'], plant_fields['category'], plant_fields['description'],
         img1, t1, img2, t2, img3, t3, plant_fields['weight'], plant_fields['in_stock'],
     )
     if new_id:
-        _process_catalog_file_changes(table, new_id)
-        flash(f'{item_label} added successfully.', 'success')
-        return redirect(list_route)
+        uploaded_count, deleted_count = _process_catalog_file_changes(table, new_id)
+        _flash_catalog_save_message(item_label, 'added', table, new_id, uploaded_count, deleted_count)
+        return redirect(url_for(edit_route, id=new_id))
     fail_msg = f'Failed to add {table[:-1]}: {err}' if err else f'Failed to add {table[:-1]}. Check database connection.'
     return dict(_blank_catalog_item(), **plant_fields), fail_msg, 'error'
 
@@ -1020,6 +1074,80 @@ def serve_catalog_file(id):
         mimetype=record['file_type'] or 'application/octet-stream',
         headers={'Content-Disposition': f'attachment; filename="{record["file_name"]}"'},
     )
+
+
+@app.route('/admin/api/catalog/files/<int:id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_catalog_file(id):
+    """Delete a saved catalog document and refresh the product RAG index."""
+    from models import delete_product_files, get_product_file_by_id
+
+    record = get_product_file_by_id(id)
+    if not record:
+        return jsonify(success=False, error='File not found.'), 404
+
+    product_type = record['product_type']
+    product_id = record['product_id']
+    table = CATALOG_TYPE_TO_TABLE.get(product_type)
+    if not table:
+        return jsonify(success=False, error='Invalid file record.'), 400
+
+    if not delete_product_files(product_type, product_id, [id]):
+        return jsonify(success=False, error='Could not delete file.'), 400
+
+    chunk_count, index_error = _auto_index_product_rag(table, product_id)
+    if index_error:
+        return jsonify(
+            success=True,
+            warning=f'File deleted but re-index failed: {index_error}',
+            chunk_count=0,
+        )
+
+    return jsonify(success=True, chunk_count=chunk_count or 0)
+
+
+@app.route('/admin/api/rag/index', methods=['POST'])
+@admin_required
+def admin_rag_index():
+    """Index uploaded text documents for a catalog product."""
+    from rag_service import index_product, normalize_product_type
+
+    data = request.get_json(silent=True) or {}
+    product_type = normalize_product_type(data.get('product_type') or request.form.get('product_type'))
+    product_id = data.get('product_id') or request.form.get('product_id')
+
+    chunk_count, error = index_product(product_type, product_id)
+    if error:
+        return jsonify(success=False, error=error), 400
+
+    from models import get_rag_index_meta
+    meta = get_rag_index_meta(product_type, int(product_id))
+    indexed_at = meta['indexed_at'].isoformat() if meta.get('indexed_at') else None
+    return jsonify(
+        success=True,
+        chunk_count=chunk_count,
+        indexed_at=indexed_at,
+    )
+
+
+@app.route('/api/rag/chat', methods=['POST'])
+def api_rag_chat():
+    """Answer a product-scoped question using indexed documents."""
+    from rag_service import answer_question, normalize_product_type
+
+    data = request.get_json(silent=True) or {}
+    product_type = normalize_product_type(data.get('product_type'))
+    product_id = data.get('product_id')
+    product_name = (data.get('product_name') or '').strip()
+    message = (data.get('message') or '').strip()
+
+    if not product_type or product_id is None:
+        return jsonify(success=False, error='Product context is required.'), 400
+
+    answer, error = answer_question(product_type, product_id, product_name, message)
+    if error:
+        return jsonify(success=False, error=error), 400
+    return jsonify(success=True, answer=answer)
 
 
 @app.route('/admin/plants/<int:id>/image/<int:slot>')
@@ -1066,7 +1194,7 @@ def admin_tools():
 def admin_tools_new():
     from models import add_tool, update_tool
     if request.method == 'POST':
-        result = _save_tool_food_form('tools', add_tool, update_tool, url_for('admin_tools'), 'admin_tool_edit.html', 'Tool')
+        result = _save_tool_food_form('tools', add_tool, update_tool, url_for('admin_tools'), 'admin_tools_edit', 'admin_tool_edit.html', 'Tool')
         if isinstance(result, tuple) and len(result) == 3:
             item, message, message_type = result
             return render_template(
@@ -1098,7 +1226,7 @@ def admin_tools_edit(id):
     if not item:
         return redirect(url_for('admin_tools'))
     if request.method == 'POST':
-        result = _save_tool_food_form('tools', add_tool, update_tool, url_for('admin_tools'), 'admin_tool_edit.html', 'Tool', id)
+        result = _save_tool_food_form('tools', add_tool, update_tool, url_for('admin_tools'), 'admin_tools_edit', 'admin_tool_edit.html', 'Tool', id)
         if isinstance(result, tuple) and len(result) == 3:
             err_item, message, message_type = result
             return render_template(
@@ -1110,6 +1238,8 @@ def admin_tools_edit(id):
                 message=message,
                 message_type=message_type,
                 catalog_files=_catalog_files_for('tools', id),
+                rag_index_meta=_catalog_rag_meta('tools', id),
+                rag_product_type='tool',
             )
         return result
     return render_template(
@@ -1119,6 +1249,8 @@ def admin_tools_edit(id):
         form_action=url_for('admin_tools_edit', id=id),
         image_route='serve_tool_image',
         catalog_files=_catalog_files_for('tools', id),
+        rag_index_meta=_catalog_rag_meta('tools', id),
+        rag_product_type='tool',
     )
 
 
@@ -1173,7 +1305,7 @@ def admin_foods():
 def admin_foods_new():
     from models import add_food, update_food
     if request.method == 'POST':
-        result = _save_tool_food_form('foods', add_food, update_food, url_for('admin_foods'), 'admin_food_edit.html', 'Food')
+        result = _save_tool_food_form('foods', add_food, update_food, url_for('admin_foods'), 'admin_foods_edit', 'admin_food_edit.html', 'Food')
         if isinstance(result, tuple) and len(result) == 3:
             item, message, message_type = result
             return render_template(
@@ -1205,7 +1337,7 @@ def admin_foods_edit(id):
     if not item:
         return redirect(url_for('admin_foods'))
     if request.method == 'POST':
-        result = _save_tool_food_form('foods', add_food, update_food, url_for('admin_foods'), 'admin_food_edit.html', 'Food', id)
+        result = _save_tool_food_form('foods', add_food, update_food, url_for('admin_foods'), 'admin_foods_edit', 'admin_food_edit.html', 'Food', id)
         if isinstance(result, tuple) and len(result) == 3:
             err_item, message, message_type = result
             return render_template(
@@ -1217,6 +1349,8 @@ def admin_foods_edit(id):
                 message=message,
                 message_type=message_type,
                 catalog_files=_catalog_files_for('foods', id),
+                rag_index_meta=_catalog_rag_meta('foods', id),
+                rag_product_type='food',
             )
         return result
     return render_template(
@@ -1226,6 +1360,8 @@ def admin_foods_edit(id):
         form_action=url_for('admin_foods_edit', id=id),
         image_route='serve_food_image',
         catalog_files=_catalog_files_for('foods', id),
+        rag_index_meta=_catalog_rag_meta('foods', id),
+        rag_product_type='food',
     )
 
 

@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS foods (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
--- Catalog document attachments (admin uploads: PDF, TXT, CSV, etc.)
+-- Catalog document attachments (admin uploads: plain text only)
 -- product_type: plant | tool | food
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS product_files (
@@ -107,6 +107,20 @@ CREATE TABLE IF NOT EXISTS product_files (
     file_data LONGBLOB NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_product (product_type, product_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- RAG index chunks (embeddings per product document)
+CREATE TABLE IF NOT EXISTS product_rag_chunks (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_type VARCHAR(20) NOT NULL,
+    product_id INT NOT NULL,
+    file_id INT NOT NULL,
+    chunk_index INT NOT NULL,
+    content TEXT NOT NULL,
+    embedding JSON NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_product (product_type, product_id),
+    INDEX idx_file (file_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------

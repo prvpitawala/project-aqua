@@ -697,17 +697,17 @@
     {% endif %}
 
     <div id="chatOverlay" class="chat-overlay"></div>
-    <div id="chatPanel" class="chat-panel">
+    <div id="chatPanel" class="chat-panel"{% block chat_panel_attrs %}{% endblock %}>
         <div class="chat-panel-header">
-            <h3>Chat with bot</h3>
+            <h3 id="chatPanelTitle">Chat with bot</h3>
             <button type="button" class="chat-panel-close" onclick="closeChatPanel()" aria-label="Close">×</button>
         </div>
         <div id="chatMessages" class="chat-messages">
-            <div class="chat-msg bot">Hi! How can I help you today?</div>
+            <div class="chat-msg bot" id="chatWelcomeMsg">Hi! How can I help you today?</div>
         </div>
         <div class="chat-input-area">
-            <input type="text" id="chatInput" placeholder="Type your message..." onkeydown="if(event.key==='Enter')sendChatMessage()">
-            <button type="button" class="chat-send-btn" onclick="sendChatMessage()">Send</button>
+            <input type="text" id="chatInput" placeholder="Ask about this product..." onkeydown="if(event.key==='Enter')sendChatMessage()">
+            <button type="button" class="chat-send-btn" id="chatSendBtn" onclick="sendChatMessage()">Send</button>
         </div>
     </div>
 
@@ -761,9 +761,73 @@
     <div id="cartAddedToast" class="cart-added-toast" aria-live="polite"></div>
 
     <script>
-    function toggleChatPanel(){var p=document.getElementById('chatPanel');var o=document.getElementById('chatOverlay');var open=p.classList.contains('open');if(open){p.classList.remove('open');o.classList.remove('show');}else{p.classList.add('open');o.classList.add('show');document.getElementById('chatInput').focus();}}
+    function getChatProductContext() {
+        var panel = document.getElementById('chatPanel');
+        if (!panel) return null;
+        var type = panel.dataset.ragType;
+        var id = panel.dataset.ragId;
+        var name = panel.dataset.ragName || '';
+        if (!type || !id) return null;
+        return { product_type: type, product_id: parseInt(id, 10), product_name: name };
+    }
+    function setChatWelcomeMessage() {
+        var welcome = document.getElementById('chatWelcomeMsg');
+        var panel = document.getElementById('chatPanel');
+        var title = document.getElementById('chatPanelTitle');
+        if (!welcome || !panel) return;
+        var name = panel.dataset.ragName || 'this product';
+        welcome.textContent = 'Ask me anything about ' + name + '. I answer from this product\u2019s documents.';
+        if (title) title.textContent = 'Ask about ' + name;
+    }
+    function toggleChatPanel(){var p=document.getElementById('chatPanel');var o=document.getElementById('chatOverlay');var open=p.classList.contains('open');if(open){p.classList.remove('open');o.classList.remove('show');}else{setChatWelcomeMessage();p.classList.add('open');o.classList.add('show');document.getElementById('chatInput').focus();}}
     function closeChatPanel(){document.getElementById('chatPanel').classList.remove('open');document.getElementById('chatOverlay').classList.remove('show');}
-    function sendChatMessage(){var inp=document.getElementById('chatInput');var txt=inp.value.trim();if(!txt){return;}var msgs=document.getElementById('chatMessages');var userMsg=document.createElement('div');userMsg.className='chat-msg user';userMsg.textContent=txt;msgs.appendChild(userMsg);inp.value='';msgs.scrollTop=msgs.scrollHeight;var botMsg=document.createElement('div');botMsg.className='chat-msg bot';botMsg.textContent='Thanks for your message! How else can I assist you?';msgs.appendChild(botMsg);msgs.scrollTop=msgs.scrollHeight;}
+    function appendChatMessage(text, role) {
+        var msgs = document.getElementById('chatMessages');
+        var el = document.createElement('div');
+        el.className = 'chat-msg ' + role;
+        el.textContent = text;
+        msgs.appendChild(el);
+        msgs.scrollTop = msgs.scrollHeight;
+        return el;
+    }
+    function sendChatMessage(){
+        var inp = document.getElementById('chatInput');
+        var sendBtn = document.getElementById('chatSendBtn');
+        var txt = inp.value.trim();
+        if (!txt) return;
+        var ctx = getChatProductContext();
+        if (!ctx) {
+            appendChatMessage('Product context is missing. Open a product page to use the chatbot.', 'bot');
+            return;
+        }
+        appendChatMessage(txt, 'user');
+        inp.value = '';
+        inp.disabled = true;
+        if (sendBtn) sendBtn.disabled = true;
+        var loading = appendChatMessage('Thinking...', 'bot');
+        fetch('/api/rag/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({
+                product_type: ctx.product_type,
+                product_id: ctx.product_id,
+                product_name: ctx.product_name,
+                message: txt,
+            }),
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            loading.textContent = (data.success && data.answer) ? data.answer : ((data.error) || 'Sorry, I could not answer that.');
+        })
+        .catch(function() {
+            loading.textContent = 'Sorry, something went wrong. Please try again.';
+        })
+        .finally(function() {
+            inp.disabled = false;
+            if (sendBtn) sendBtn.disabled = false;
+            inp.focus();
+        });
+    }
     function resetAdminPasswordToggle(){var p=document.getElementById('adminPass');var t=document.getElementById('adminPassToggle');if(p){p.type='password';}if(t){t.classList.remove('is-visible');t.setAttribute('aria-label','Show password');t.setAttribute('aria-pressed','false');}}
     function openAdminPopup(){var m=document.getElementById('adminModal');m.classList.add('show');document.getElementById('loginError').style.display='none';document.getElementById('adminUser').value='';document.getElementById('adminPass').value='';resetAdminPasswordToggle();}
     function closeAdminPopup(){document.getElementById('adminModal').classList.remove('show');}
