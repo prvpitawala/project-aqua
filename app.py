@@ -1,3 +1,11 @@
+"""
+AquaStore Flask application.
+
+This file wires up all the pages and JSON endpoints: the public shop,
+checkout, admin catalog management, and the product-scoped RAG chatbot.
+Most business logic lives in models.py and rag_service.py — app.py mostly
+handles HTTP, forms, redirects, and templates.
+"""
 import os
 from dotenv import load_dotenv
 
@@ -10,18 +18,22 @@ from urllib.parse import urlencode
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24).hex())
-app.config['MAX_CONTENT_LENGTH'] = 64 * 1024 * 1024  # 64 MB for image uploads
+app.config['MAX_CONTENT_LENGTH'] = 64 * 1024 * 1024  # 64 MB — enough for multi-image product uploads
 
 MSG_NAME_CATEGORY_REQUIRED = 'Name and category are required.'
 MIME_JPEG = 'image/jpeg'
 CATALOG_PER_PAGE_DEFAULT = 20
 CATALOG_PER_PAGE_OPTIONS = (10, 20, 50)
+
+# Maps admin table names (plants/tools/foods) to the product_type stored in product_files / RAG tables.
 CATALOG_TABLE_TYPES = {
     'plants': 'plant',
     'tools': 'tool',
     'foods': 'food',
 }
 CATALOG_TYPE_TO_TABLE = {value: key for key, value in CATALOG_TABLE_TYPES.items()}
+
+# RAG document uploads — plain text only for now.
 ALLOWED_CATALOG_DOC_EXTENSIONS = {'.txt', '.csv', '.md'}
 ALLOWED_CATALOG_DOC_MIMES = {
     'text/plain', 'text/csv', 'text/markdown',
@@ -61,7 +73,12 @@ HOME_TESTIMONIALS = (
 
 
 def paginate_list(items, page, per_page=CATALOG_PER_PAGE_DEFAULT):
-    """Slice a list for the requested page. Returns (page_items, total, total_pages, current_page)."""
+    """
+    Slice an in-memory list for pagination.
+
+    Used where we don't paginate in SQL. Returns the page slice plus totals
+    so templates can render page numbers.
+    """
     total = len(items)
     total_pages = max(1, (total + per_page - 1) // per_page) if total else 1
     current_page = max(1, min(page or 1, total_pages))
@@ -70,7 +87,12 @@ def paginate_list(items, page, per_page=CATALOG_PER_PAGE_DEFAULT):
 
 
 def _resolve_catalog_per_page():
-    """Resolve items-per-page from query or session. Resets to page 1 when per_page changes."""
+    """
+    Figure out how many catalog items to show per page.
+
+    Remembers the user's choice in the session. If they change per_page,
+    we jump back to page 1 so they don't land on an empty page.
+    """
     per_page_arg = request.args.get('per_page', type=int)
     page = request.args.get('page', 1, type=int)
     prev_per_page = session.get('catalog_per_page', CATALOG_PER_PAGE_DEFAULT)
@@ -85,7 +107,7 @@ def _resolve_catalog_per_page():
 
 
 def _session_per_page_for_path():
-    """Return the session-backed per_page value for the current request path."""
+    """Pick the right session key for per_page depending on which admin list we're on."""
     if request.path.startswith('/admin/orders'):
         return session.get('orders_per_page', 10)
     if request.path.startswith('/admin/messages'):
@@ -95,6 +117,12 @@ def _session_per_page_for_path():
 
 @app.context_processor
 def inject_pagination_helpers():
+    """
+    Expose page_url() and filter constants to every template.
+
+    page_url() rebuilds the current URL with a different ?page= so pagination
+    links keep the active filters.
+    """
     def page_url(page_num):
         params = []
         has_per_page = False
@@ -128,6 +156,7 @@ def inject_pagination_helpers():
 
 @app.route('/')
 def index():
+    """Home page — featured products, category previews, and testimonials."""
     return render_template(
         'public.html',
         top_products=get_top_selling(),
@@ -138,6 +167,7 @@ def index():
 
 @app.route('/public')
 def public():
+    """Legacy URL — send people to the main home page."""
     return redirect(url_for('index'))
 
 
@@ -175,12 +205,14 @@ ACCESSORY_PRICE_RANGES = (
 
 
 def _filter_by_category(items, categories):
+    """Keep only items whose category is in the selected filter list."""
     if not categories:
         return items
     return [item for item in items if item.get('category') in categories]
 
 
 def _attach_catalog_images(items, endpoint):
+    """Add an `image` URL to each list item that has a primary photo in the DB."""
     for item in items:
         if item.get('has_image1'):
             item['image'] = url_for(endpoint, id=item['id'], slot=1)
@@ -189,7 +221,12 @@ def _attach_catalog_images(items, endpoint):
 
 
 def _attach_order_item_images(items):
-    """Attach primary catalog image URLs to order line items when still available."""
+    """
+    Look up a thumbnail for each line item on an admin order detail page.
+
+    Orders store product_type + product_id; we resolve those to the same image
+    routes the storefront uses.
+    """
     from models import get_food_image, get_plant_image, get_tool_image
 
     image_fetchers = {
@@ -212,7 +249,7 @@ def _attach_order_item_images(items):
 
 
 def _attach_catalog_detail_images(item, endpoint):
-    """Attach primary image and all gallery slots for product detail pages."""
+    """Build the image gallery (up to 3 slots) for a product detail page."""
     images = []
     for slot in (1, 2, 3):
         if item.get(f'has_image{slot}'):
@@ -225,6 +262,7 @@ def _attach_catalog_detail_images(item, endpoint):
 
 
 def _filter_plants(plants, co2, light, stock, categories):
+    """Apply sidebar filters for the public plant catalog."""
     if categories:
         plants = _filter_by_category(plants, categories)
     if co2:
@@ -234,8 +272,11 @@ def _filter_plants(plants, co2, light, stock, categories):
     return _filter_items_by_stock(plants, stock)
 
 
+# --- Public catalog pages (HTML) ---
+
 @app.route('/aqua-plants')
 def aqua_plants():
+    """Browse aquatic plants with CO₂, light, stock, category, and price filters."""
     from models import get_plants_paginated
     co2 = request.args.getlist('co2')
     light = request.args.getlist('light')
@@ -265,6 +306,7 @@ def aqua_plants():
 
 @app.route('/aqua-plants/<int:id>')
 def plant_detail(id):
+    """Single plant page — gallery, care info, and the product-scoped chatbot."""
     from models import get_plant_by_id
     plant = get_plant_by_id(id)
     if not plant:
@@ -275,6 +317,7 @@ def plant_detail(id):
 
 @app.route('/api/plants')
 def api_plants():
+    """JSON plant list for infinite scroll / AJAX loading on the storefront."""
     from models import get_plants_paginated
     page = request.args.get('page', 1, type=int)
     co2 = request.args.getlist('co2')
@@ -292,6 +335,7 @@ def api_plants():
 
 @app.route('/accessories')
 def accessories():
+    """Browse tools and accessories (stored as 'tools' in the database)."""
     from models import get_tools_paginated
     stock = request.args.getlist('stock')
     categories = request.args.getlist('category')
@@ -317,6 +361,7 @@ def accessories():
 
 @app.route('/accessories/<int:id>')
 def accessory_detail(id):
+    """Single accessory page with gallery and product-scoped chatbot."""
     from models import get_tool_by_id
     item = get_tool_by_id(id)
     if not item:
@@ -327,6 +372,7 @@ def accessory_detail(id):
 
 @app.route('/api/accessories')
 def api_accessories():
+    """JSON accessory list for AJAX pagination on the storefront."""
     from models import get_tools_paginated
     page = request.args.get('page', 1, type=int)
     stock = request.args.getlist('stock')
@@ -342,6 +388,7 @@ def api_accessories():
 
 @app.route('/foods')
 def foods():
+    """Browse fish food products."""
     from models import get_foods_paginated
     stock = request.args.getlist('stock')
     categories = request.args.getlist('category')
@@ -367,6 +414,7 @@ def foods():
 
 @app.route('/foods/<int:id>')
 def food_detail(id):
+    """Single food product page with gallery and product-scoped chatbot."""
     from models import get_food_by_id
     item = get_food_by_id(id)
     if not item:
@@ -377,6 +425,7 @@ def food_detail(id):
 
 @app.route('/api/foods')
 def api_foods():
+    """JSON food list for AJAX pagination on the storefront."""
     from models import get_foods_paginated
     page = request.args.get('page', 1, type=int)
     stock = request.args.getlist('stock')
@@ -392,7 +441,12 @@ def api_foods():
 
 @app.route('/api/delivery-rule')
 def api_delivery_rule():
-    """Return delivery pricing rule for cart: base_price + (weight_kg * extra_per_kg)."""
+    """
+    Return delivery pricing for the checkout cart.
+
+    Formula: base_price + (weight_kg × extra_per_kg). Falls back to defaults
+    if nothing is configured in the database yet.
+    """
     from models import get_delivery_base_per_kg
     rule = get_delivery_base_per_kg()
     if not rule:
@@ -401,7 +455,11 @@ def api_delivery_rule():
 
 
 def get_top_selling():
-    """Return a mix of top products from plants, accessories, and foods."""
+    """
+    Grab a small mix of products for the home page carousel.
+
+    Not true "top sellers" yet — just the first few from each category.
+    """
     from models import get_foods, get_plants, get_tools
 
     items = []
@@ -421,7 +479,7 @@ def get_top_selling():
 
 
 def _first_item_image_url(items, endpoint):
-    """Return image URL for the first catalog item that has an image."""
+    """First product in a list that has an image — used for category card previews."""
     for item in items:
         if item.get('has_image1'):
             return url_for(endpoint, id=item['id'], slot=1)
@@ -429,7 +487,7 @@ def _first_item_image_url(items, endpoint):
 
 
 def get_category_preview_images():
-    """Sample image per home-page category card (plants, tools, foods)."""
+    """One sample image per category for the home page shop cards."""
     from models import get_foods, get_plants, get_tools
 
     return {
@@ -441,11 +499,13 @@ def get_category_preview_images():
 
 @app.route('/tools')
 def tools():
+    """Placeholder tools page (main shop uses /accessories)."""
     return render_template('tools.html')
 
 
 @app.route('/contact', methods=['GET', 'POST'])
 def contact():
+    """Contact form — saves messages for the admin inbox."""
     if request.method == 'POST':
         from models import save_contact_message
         name = request.form.get('name', '').strip()
@@ -462,11 +522,17 @@ def contact():
 
 @app.route('/checkout')
 def checkout():
+    """Checkout page — cart checkout posts to /api/orders via JavaScript."""
     return render_template('checkout.html')
 
 
 @app.route('/api/orders', methods=['POST'])
 def api_create_order():
+    """
+    Place an order from the checkout page.
+
+    Expects JSON with customer details and a list of cart line items.
+    """
     from models import create_order
 
     data = request.get_json(silent=True) or {}
@@ -499,6 +565,7 @@ def api_create_order():
 
 @app.route('/signin')
 def signin():
+    """Open the admin sign-in modal on the home page (or go to dashboard if already logged in)."""
     if session.get('admin'):
         return redirect(url_for('admin_dashboard'))
     return redirect(url_for('index') + '?open=signin')
@@ -506,6 +573,7 @@ def signin():
 
 @app.route('/admin/login', methods=['POST'])
 def admin_login():
+    """AJAX admin login — sets session['admin'] and returns a redirect URL."""
     username = request.form.get('username', '')
     password = request.form.get('password', '')
     if username and password:
@@ -517,7 +585,11 @@ def admin_login():
 
 
 def admin_required(f):
-    """Decorator to require admin login."""
+    """
+    Guard admin routes — send unauthenticated visitors back to the home page.
+
+    We use a session flag rather than JWT; fine for a single-store admin panel.
+    """
     @wraps(f)
     def inner(*args, **kwargs):
         if not session.get('admin'):
@@ -526,9 +598,12 @@ def admin_required(f):
     return inner
 
 
+# --- Admin area ---
+
 @app.route('/admin')
 @admin_required
 def admin_dashboard():
+    """Admin home — links to catalog, orders, messages, etc."""
     return render_template('admin_dashboard.html')
 
 
@@ -536,7 +611,11 @@ PER_PAGE_OPTIONS = (5, 10, 20, 50)
 
 
 def _resolve_admin_per_page(session_key, default, options):
-    """Resolve admin list page/per_page from query or session."""
+    """
+    Same idea as _resolve_catalog_per_page, but for admin lists (orders, messages).
+
+    Keeps the user's preferred page size in the session.
+    """
     per_page_arg = request.args.get('per_page', type=int)
     page = request.args.get('page', 1, type=int)
     prev_per_page = session.get(session_key, default)
@@ -553,6 +632,7 @@ def _resolve_admin_per_page(session_key, default, options):
 @app.route('/admin/messages')
 @admin_required
 def admin_messages():
+    """Inbox of contact form submissions from customers."""
     from models import get_contact_messages_paginated
     per_page, page = _resolve_admin_per_page('messages_per_page', 10, PER_PAGE_OPTIONS)
     messages, total, total_pages, current_page = get_contact_messages_paginated(page, per_page)
@@ -573,6 +653,7 @@ def admin_messages():
 @app.route('/admin/messages/<int:message_id>/reply', methods=['POST'])
 @admin_required
 def admin_message_reply(message_id):
+    """Save an admin reply to a contact message (email sending not wired up yet)."""
     from models import get_contact_message_by_id
 
     message = get_contact_message_by_id(message_id)
@@ -596,6 +677,7 @@ def admin_message_reply(message_id):
 @app.route('/admin/orders')
 @admin_required
 def admin_orders():
+    """Paginated list of customer orders with status summary counts."""
     from models import get_orders_paginated, get_order_status_counts
 
     per_page, page = _resolve_admin_per_page('orders_per_page', 10, PER_PAGE_OPTIONS)
@@ -619,6 +701,7 @@ def admin_orders():
 @app.route('/admin/orders/<int:order_id>', methods=['GET'])
 @admin_required
 def admin_order_detail(order_id):
+    """Single order view — line items, customer details, status update form."""
     from models import get_order_by_id
 
     order = get_order_by_id(order_id)
@@ -640,6 +723,7 @@ def admin_order_detail(order_id):
 @app.route('/admin/orders/<int:order_id>/status', methods=['POST'])
 @admin_required
 def admin_order_status(order_id):
+    """Update order status from the list or detail page, then redirect back."""
     from models import update_order_status
 
     status = request.form.get('status', '').strip()
@@ -667,7 +751,7 @@ def admin_order_status(order_id):
 
 
 def _filter_items_by_stock(items, stock):
-    """Filter items by stock status. Returns filtered list."""
+    """Filter catalog rows by in-stock / out-of-stock sidebar selections."""
     if not stock:
         return items
     in_ok = 'in' in stock
@@ -680,16 +764,17 @@ def _filter_items_by_stock(items, stock):
 
 
 def _filter_plants_for_admin(plants, co2, light, stock, categories=None):
-    """Apply co2, light, stock, and category filters to plants."""
+    """Same plant filters as the storefront, reused on the admin plant list."""
     return _filter_plants(plants, co2, light, stock, categories or [])
 
 
 def _ensure_plant_images(plants):
-    """Add image URL to plants that have has_image1 but no image key."""
+    """Make sure list rows have an `image` key templates can render."""
     _attach_catalog_images(plants, 'serve_plant_image')
 
 
 def _blank_catalog_item():
+    """Empty defaults for add/edit product forms."""
     return {
         'id': None,
         'name': '',
@@ -708,6 +793,7 @@ def _blank_catalog_item():
 
 
 def _read_form_images():
+    """Read all three optional image upload slots from the current POST."""
     img1, img1_type = _read_uploaded_image('image1')
     img2, img2_type = _read_uploaded_image('image2')
     img3, img3_type = _read_uploaded_image('image3')
@@ -715,6 +801,7 @@ def _read_form_images():
 
 
 def _parse_catalog_form_fields():
+    """Pull shared product fields (name, price, category, etc.) out of the form POST."""
     try:
         price = float(request.form.get('price', 0) or 0)
     except ValueError:
@@ -733,6 +820,11 @@ def _parse_catalog_form_fields():
 
 
 def _is_allowed_catalog_document(filename, mime_type):
+    """
+    Check whether an uploaded file is an allowed RAG document.
+
+    We allow .txt/.csv/.md by extension, or anything the browser labels as text/*.
+    """
     ext = os.path.splitext((filename or '').lower())[1]
     if ext in ALLOWED_CATALOG_DOC_EXTENSIONS:
         return True
@@ -745,6 +837,7 @@ def _is_allowed_catalog_document(filename, mime_type):
 
 
 def _catalog_files_for(table, item_id=None):
+    """List attached document metadata for an admin edit form (no file bytes)."""
     if not item_id:
         return []
     from models import get_product_files
@@ -752,6 +845,7 @@ def _catalog_files_for(table, item_id=None):
 
 
 def _catalog_rag_meta(table, item_id=None):
+    """How many chunks are indexed and when — shown on the Documents section."""
     if not item_id:
         return {'chunk_count': 0, 'indexed_at': None}
     from models import get_rag_index_meta
@@ -759,7 +853,14 @@ def _catalog_rag_meta(table, item_id=None):
 
 
 def _process_catalog_file_changes(table, item_id):
-    """Apply document uploads and deletions. Returns (uploaded_count, deleted_count)."""
+    """
+    Handle document uploads and deletions when a product form is saved.
+
+    HTML field names use brackets (catalog_documents[]) — we read both forms
+    of the name so nothing gets silently dropped.
+
+    Returns (uploaded_count, deleted_count).
+    """
     from models import add_product_file, delete_product_files
     from werkzeug.utils import secure_filename
 
@@ -792,7 +893,12 @@ def _process_catalog_file_changes(table, item_id):
 
 
 def _auto_index_product_rag(table, item_id):
-    """Rebuild RAG index after document changes. Returns (chunk_count, error_message)."""
+    """
+    Rebuild the RAG index after documents change.
+
+    If all files were removed, we clear the chunks instead of calling OpenAI.
+    Returns (chunk_count, error_message).
+    """
     from models import delete_rag_chunks_for_product, get_product_files
     from rag_service import index_product
 
@@ -808,7 +914,11 @@ def _auto_index_product_rag(table, item_id):
 
 
 def _flash_catalog_save_message(item_label, action, table, item_id, uploaded_count, deleted_count):
-    """Flash success/error after save; auto-index when documents changed."""
+    """
+    Show a friendly flash message after saving a product.
+
+    If documents changed, we auto-index here so admin doesn't need a separate step.
+    """
     docs_changed = uploaded_count > 0 or deleted_count > 0
     if not docs_changed:
         flash(f'{item_label} {action} successfully.', 'success')
@@ -831,7 +941,7 @@ def _flash_catalog_save_message(item_label, action, table, item_id, uploaded_cou
 
 
 def _get_flashed_notice(default_type='success'):
-    """Return the first flashed message, consumed so it won't reappear on refresh."""
+    """Read one flash message for templates (consumed so refresh won't repeat it)."""
     messages = get_flashed_messages(with_categories=True)
     if messages:
         category, message = messages[0]
@@ -840,6 +950,7 @@ def _get_flashed_notice(default_type='success'):
 
 
 def _admin_list_flash_message(item_label):
+    """Pick up a success/error flash after redirecting back to an admin list."""
     message, category = _get_flashed_notice()
     if message:
         return message, category
@@ -847,7 +958,7 @@ def _admin_list_flash_message(item_label):
 
 
 def _admin_delete_product(table, item_id, get_by_id, list_route, item_label):
-    """Delete a catalog product and redirect back to its admin list."""
+    """Delete a catalog row and flash success or failure."""
     from models import delete_item
 
     if not get_by_id(item_id):
@@ -859,9 +970,12 @@ def _admin_delete_product(table, item_id, get_by_id, list_route, item_label):
     return redirect(list_route)
 
 
+# --- Admin catalog (plants, tools, foods) ---
+
 @app.route('/admin/plants', methods=['GET'])
 @admin_required
 def admin_plants():
+    """Manage plants — same filters as the public catalog plus edit/delete actions."""
     from models import get_plants_paginated
     message, message_type = _admin_list_flash_message('Plant')
     co2 = request.args.getlist('co2')
@@ -895,7 +1009,7 @@ def admin_plants():
 @app.route('/admin/plants/<int:id>')
 @admin_required
 def admin_plant_detail(id):
-    """Admin view of plant details (like public plant_detail)."""
+    """Admin preview of a plant — same info as the public detail page."""
     from models import get_plant_by_id
     plant = get_plant_by_id(id)
     if not plant:
@@ -905,7 +1019,12 @@ def admin_plant_detail(id):
 
 
 def _save_plant_form(item_id=None):
-    """Process plant create/edit form. Returns redirect response or (item, message, message_type) for re-render."""
+    """
+    Handle create/update POST for the plant edit form.
+
+    On success, redirects back to the edit page (so admin can upload/index docs).
+    On validation failure, returns (item, message, type) to re-render the form.
+    """
     from models import add_plant, update_plant, _update_item_images
     form_data = _parse_catalog_form_fields()
     if not form_data['name'] or not form_data['category']:
@@ -950,6 +1069,7 @@ def _save_plant_form(item_id=None):
 @app.route('/admin/plants/new', methods=['GET', 'POST'])
 @admin_required
 def admin_plants_new():
+    """Add a new plant — documents can be attached after the first save."""
     if request.method == 'POST':
         result = _save_plant_form()
         if isinstance(result, tuple) and len(result) == 3:
@@ -976,6 +1096,7 @@ def admin_plants_new():
 @app.route('/admin/plants/<int:id>/edit', methods=['GET', 'POST'])
 @admin_required
 def admin_plants_edit(id):
+    """Edit plant details, images, and RAG documents."""
     from models import get_plant_by_id
     plant = get_plant_by_id(id)
     if not plant:
@@ -1010,12 +1131,17 @@ def admin_plants_edit(id):
 @app.route('/admin/plants/<int:id>/delete', methods=['POST'])
 @admin_required
 def admin_plants_delete(id):
+    """Remove a plant from the catalog."""
     from models import get_plant_by_id
     return _admin_delete_product('plants', id, get_plant_by_id, url_for('admin_plants'), 'Plant')
 
 
 def _save_tool_food_form(table, add_fn, update_fn, list_route, edit_route, edit_template, item_label, item_id=None):
-    """Process tool/food create/edit form."""
+    """
+    Shared create/edit handler for tools and foods.
+
+    Same shape as plants but without the extra care-level fields.
+    """
     from models import _update_item_images
     form_data = _parse_catalog_form_fields()
     plant_fields = {k: form_data[k] for k in ('name', 'price', 'category', 'weight', 'description', 'in_stock')}
@@ -1048,7 +1174,7 @@ def _save_tool_food_form(table, add_fn, update_fn, list_route, edit_route, edit_
 
 
 def _read_uploaded_image(field_name):
-    """Read uploaded file and return (bytes, mime_type) or (None, None)."""
+    """Read one image upload field; returns (bytes, mime) or (None, None) if empty."""
     f = request.files.get(field_name)
     if not f or f.filename == '':
         return (None, None)
@@ -1061,10 +1187,12 @@ def _read_uploaded_image(field_name):
     return (data, mime[:20])
 
 
+# --- Catalog documents & RAG ---
+
 @app.route('/admin/catalog-files/<int:id>')
 @admin_required
 def serve_catalog_file(id):
-    """Download a catalog document attachment."""
+    """Download an attached text document from the admin edit page."""
     from models import get_product_file_by_id
     record = get_product_file_by_id(id)
     if not record:
@@ -1079,7 +1207,11 @@ def serve_catalog_file(id):
 @app.route('/admin/api/catalog/files/<int:id>/delete', methods=['POST'])
 @admin_required
 def admin_delete_catalog_file(id):
-    """Delete a saved catalog document and refresh the product RAG index."""
+    """
+    Delete one saved document immediately (AJAX from the Remove button).
+
+    Also rebuilds the RAG index so the chatbot stops using that file's content.
+    """
     from models import delete_product_files, get_product_file_by_id
 
     record = get_product_file_by_id(id)
@@ -1109,7 +1241,11 @@ def admin_delete_catalog_file(id):
 @app.route('/admin/api/rag/index', methods=['POST'])
 @admin_required
 def admin_rag_index():
-    """Index uploaded text documents for a catalog product."""
+    """
+    Manually re-index a product's documents (Re-index button in admin).
+
+    Normally indexing happens automatically on save; this is for a manual refresh.
+    """
     from rag_service import index_product, normalize_product_type
 
     data = request.get_json(silent=True) or {}
@@ -1132,7 +1268,12 @@ def admin_rag_index():
 
 @app.route('/api/rag/chat', methods=['POST'])
 def api_rag_chat():
-    """Answer a product-scoped question using indexed documents."""
+    """
+    Product-scoped chatbot endpoint used on plant/food/accessory detail pages.
+
+    Expects JSON: product_type, product_id, product_name, message.
+    Answers only from that product's indexed documents (see rag_service.py).
+    """
     from rag_service import answer_question, normalize_product_type
 
     data = request.get_json(silent=True) or {}
@@ -1152,7 +1293,7 @@ def api_rag_chat():
 
 @app.route('/admin/plants/<int:id>/image/<int:slot>')
 def serve_plant_image(id, slot):
-    """Serve a plant image from the database."""
+    """Serve a plant photo stored as a blob in MySQL (slots 1–3)."""
     from models import get_plant_image
     data, mime = get_plant_image(id, slot)
     if not data:
@@ -1163,6 +1304,7 @@ def serve_plant_image(id, slot):
 @app.route('/admin/tools', methods=['GET'])
 @admin_required
 def admin_tools():
+    """Manage accessories/tools."""
     from models import get_tools_paginated
     message, message_type = _admin_list_flash_message('Tool')
     stock = request.args.getlist('stock')
@@ -1192,6 +1334,7 @@ def admin_tools():
 @app.route('/admin/tools/new', methods=['GET', 'POST'])
 @admin_required
 def admin_tools_new():
+    """Add a new tool/accessory."""
     from models import add_tool, update_tool
     if request.method == 'POST':
         result = _save_tool_food_form('tools', add_tool, update_tool, url_for('admin_tools'), 'admin_tools_edit', 'admin_tool_edit.html', 'Tool')
@@ -1221,6 +1364,7 @@ def admin_tools_new():
 @app.route('/admin/tools/<int:id>/edit', methods=['GET', 'POST'])
 @admin_required
 def admin_tools_edit(id):
+    """Edit a tool — including RAG documents."""
     from models import add_tool, get_tool_by_id, update_tool
     item = get_tool_by_id(id)
     if not item:
@@ -1257,13 +1401,14 @@ def admin_tools_edit(id):
 @app.route('/admin/tools/<int:id>/delete', methods=['POST'])
 @admin_required
 def admin_tools_delete(id):
+    """Remove a tool from the catalog."""
     from models import get_tool_by_id
     return _admin_delete_product('tools', id, get_tool_by_id, url_for('admin_tools'), 'Tool')
 
 
 @app.route('/admin/tools/<int:id>/image/<int:slot>')
 def serve_tool_image(id, slot):
-    """Serve a tool image from the database."""
+    """Serve a tool/accessory photo from MySQL."""
     from models import get_tool_image
     data, mime = get_tool_image(id, slot)
     if not data:
@@ -1274,6 +1419,7 @@ def serve_tool_image(id, slot):
 @app.route('/admin/foods', methods=['GET'])
 @admin_required
 def admin_foods():
+    """Manage fish food products."""
     from models import get_foods_paginated
     message, message_type = _admin_list_flash_message('Food')
     stock = request.args.getlist('stock')
@@ -1303,6 +1449,7 @@ def admin_foods():
 @app.route('/admin/foods/new', methods=['GET', 'POST'])
 @admin_required
 def admin_foods_new():
+    """Add a new food product."""
     from models import add_food, update_food
     if request.method == 'POST':
         result = _save_tool_food_form('foods', add_food, update_food, url_for('admin_foods'), 'admin_foods_edit', 'admin_food_edit.html', 'Food')
@@ -1332,6 +1479,7 @@ def admin_foods_new():
 @app.route('/admin/foods/<int:id>/edit', methods=['GET', 'POST'])
 @admin_required
 def admin_foods_edit(id):
+    """Edit a food product — including RAG documents."""
     from models import add_food, get_food_by_id, update_food
     item = get_food_by_id(id)
     if not item:
@@ -1368,13 +1516,14 @@ def admin_foods_edit(id):
 @app.route('/admin/foods/<int:id>/delete', methods=['POST'])
 @admin_required
 def admin_foods_delete(id):
+    """Remove a food product from the catalog."""
     from models import get_food_by_id
     return _admin_delete_product('foods', id, get_food_by_id, url_for('admin_foods'), 'Food')
 
 
 @app.route('/admin/foods/<int:id>/image/<int:slot>')
 def serve_food_image(id, slot):
-    """Serve a food image from the database."""
+    """Serve a food product photo from MySQL."""
     from models import get_food_image
     data, mime = get_food_image(id, slot)
     if not data:
@@ -1385,6 +1534,7 @@ def serve_food_image(id, slot):
 @app.route('/admin/delivery-prices', methods=['GET', 'POST'])
 @admin_required
 def admin_delivery_prices():
+    """Configure base delivery fee and per-kg surcharge used at checkout."""
     from models import get_delivery_base_per_kg, update_delivery_base_per_kg
     base_rule = get_delivery_base_per_kg()
     if not base_rule:
@@ -1413,6 +1563,7 @@ def admin_delivery_prices():
 
 @app.route('/admin/logout')
 def admin_logout():
+    """Sign out of the admin panel."""
     session.pop('admin', None)
     return redirect(url_for('index'))
 
