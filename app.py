@@ -57,34 +57,50 @@ HOME_TESTIMONIALS = (
         'detail': 'First-time aquarium owner · Galle',
         'rating': 5,
     },
-    {
-        'quote': 'Excellent selection of carpet plants and fertilizers. Delivery to Negombo was quick and every stem was in perfect condition.',
-        'name': 'Nethmi Silva',
-        'detail': 'Nano tank enthusiast · Negombo',
-        'rating': 4,
-    },
-    {
-        'quote': 'We buy fish food and filter media for our shop from AquaStore regularly. Consistent quality and reliable stock every time.',
-        'name': 'Kasun Wickramasinghe',
-        'detail': 'Pet shop owner · Matara',
-        'rating': 5,
-    },
 )
 
+# Static files for home-page featured products (see scripts/export_home_top_images.py).
+HOME_TOP_SELLING_IMAGES = {
+    'plant': 'images/home/top-plant.jpg',
+    'accessory': 'images/home/top-accessory.jpg',
+    'food': 'images/home/top-food.jpg',
+}
 
-def paginate_list(items, page, per_page=CATALOG_PER_PAGE_DEFAULT):
-    """
-    Slice an in-memory list for pagination.
+PLANT_CATEGORIES = [
+    'Anubias & Fern', 'Background Plant', 'Bucephalandra', 'Carpeting plant',
+    'Cryptocoryne', 'Epiphyte plants', 'Floating plants', 'Ludwigia Varieties',
+    'Midground Plant', 'Moss', 'Rare plants', 'Rotala Varieties', 'Other'
+]
+ACCESSORY_CATEGORIES = [
+    'Aquarium Soil', 'water Pump', 'Filter Media', 'CO2 accessaries',
+    'Fertilizers & Treatment', 'Temperature accessories', 'Air pumps', 'Other product'
+]
+FOOD_CATEGORIES = ['Flakes', 'Pellets', 'Freeze-dried', 'Treats']
+PLANT_PRICE_RANGES = (
+    {'id': '0-500', 'label': 'Under LKR 500'},
+    {'id': '500-1000', 'label': 'LKR 500 - 1000'},
+    {'id': '1000-2000', 'label': 'LKR 1000 - 2000'},
+    {'id': '2000-5000', 'label': 'LKR 2000 - 5000'},
+    {'id': '5000+', 'label': 'More than LKR 5000'},
+)
+FOOD_PRICE_RANGES = (
+    {'id': '0-500', 'label': 'Under LKR 500'},
+    {'id': '500-1000', 'label': 'LKR 500 - 1000'},
+    {'id': '1000-1500', 'label': 'LKR 1000 - 1500'},
+    {'id': '2000-5000', 'label': 'LKR 2000 - 5000'},
+    {'id': '5000+', 'label': 'More than LKR 5000'},
+)
+ACCESSORY_PRICE_RANGES = (
+    {'id': '0-1000', 'label': 'Under LKR 1000'},
+    {'id': '1000-2000', 'label': 'LKR 1000 - 2000'},
+    {'id': '2000-3000', 'label': 'LKR 2000 - 3000'},
+    {'id': '2000-5000', 'label': 'LKR 2000 - 5000'},
+    {'id': '5000+', 'label': 'More than LKR 5000'},
+)
+PER_PAGE_OPTIONS = (5, 10, 20, 50)
 
-    Used where we don't paginate in SQL. Returns the page slice plus totals
-    so templates can render page numbers.
-    """
-    total = len(items)
-    total_pages = max(1, (total + per_page - 1) // per_page) if total else 1
-    current_page = max(1, min(page or 1, total_pages))
-    start = (current_page - 1) * per_page
-    return items[start:start + per_page], total, total_pages, current_page
 
+# --- Helpers: pagination ---
 
 def _resolve_catalog_per_page():
     """
@@ -113,6 +129,25 @@ def _session_per_page_for_path():
     if request.path.startswith('/admin/messages'):
         return session.get('messages_per_page', 10)
     return session.get('catalog_per_page', CATALOG_PER_PAGE_DEFAULT)
+
+
+def _resolve_admin_per_page(session_key, default, options):
+    """
+    Same idea as _resolve_catalog_per_page, but for admin lists (orders, messages).
+
+    Keeps the user's preferred page size in the session.
+    """
+    per_page_arg = request.args.get('per_page', type=int)
+    page = request.args.get('page', 1, type=int)
+    prev_per_page = session.get(session_key, default)
+    if per_page_arg is not None and per_page_arg in options:
+        session[session_key] = per_page_arg
+        if per_page_arg != prev_per_page:
+            page = 1
+    per_page = session.get(session_key, default)
+    if per_page not in options:
+        per_page = default
+    return per_page, page
 
 
 @app.context_processor
@@ -154,62 +189,7 @@ def inject_pagination_helpers():
     )
 
 
-@app.route('/')
-def index():
-    """Home page — featured products, category previews, and testimonials."""
-    return render_template(
-        'public.html',
-        top_products=get_top_selling(),
-        category_images=get_category_preview_images(),
-        testimonials=HOME_TESTIMONIALS,
-    )
-
-
-@app.route('/public')
-def public():
-    """Legacy URL — send people to the main home page."""
-    return redirect(url_for('index'))
-
-
-PLANT_CATEGORIES = [
-    'Anubias & Fern', 'Background Plant', 'Bucephalandra', 'Carpeting plant',
-    'Cryptocoryne', 'Epiphyte plants', 'Floating plants', 'Ludwigia Varieties',
-    'Midground Plant', 'Moss', 'Rare plants', 'Rotala Varieties', 'Other'
-]
-ACCESSORY_CATEGORIES = [
-    'Aquarium Soil', 'water Pump', 'Filter Media', 'CO2 accessaries',
-    'Fertilizers & Treatment', 'Temperature accessories', 'Air pumps', 'Other product'
-]
-FOOD_CATEGORIES = ['Flakes', 'Pellets', 'Freeze-dried', 'Treats']
-PLANT_PRICE_RANGES = (
-    {'id': '0-500', 'label': 'Under LKR 500'},
-    {'id': '500-1000', 'label': 'LKR 500 - 1000'},
-    {'id': '1000-2000', 'label': 'LKR 1000 - 2000'},
-    {'id': '2000-5000', 'label': 'LKR 2000 - 5000'},
-    {'id': '5000+', 'label': 'More than LKR 5000'},
-)
-FOOD_PRICE_RANGES = (
-    {'id': '0-500', 'label': 'Under LKR 500'},
-    {'id': '500-1000', 'label': 'LKR 500 - 1000'},
-    {'id': '1000-1500', 'label': 'LKR 1000 - 1500'},
-    {'id': '2000-5000', 'label': 'LKR 2000 - 5000'},
-    {'id': '5000+', 'label': 'More than LKR 5000'},
-)
-ACCESSORY_PRICE_RANGES = (
-    {'id': '0-1000', 'label': 'Under LKR 1000'},
-    {'id': '1000-2000', 'label': 'LKR 1000 - 2000'},
-    {'id': '2000-3000', 'label': 'LKR 2000 - 3000'},
-    {'id': '2000-5000', 'label': 'LKR 2000 - 5000'},
-    {'id': '5000+', 'label': 'More than LKR 5000'},
-)
-
-
-def _filter_by_category(items, categories):
-    """Keep only items whose category is in the selected filter list."""
-    if not categories:
-        return items
-    return [item for item in items if item.get('category') in categories]
-
+# --- Helpers: catalog images ---
 
 def _attach_catalog_images(items, endpoint):
     """Add an `image` URL to each list item that has a primary photo in the DB."""
@@ -261,220 +241,50 @@ def _attach_catalog_detail_images(item, endpoint):
     item['image'] = images[0]['url'] if images else ''
 
 
-def _filter_plants(plants, co2, light, stock, categories):
-    """Apply sidebar filters for the public plant catalog."""
-    if categories:
-        plants = _filter_by_category(plants, categories)
-    if co2:
-        plants = [p for p in plants if (p.get('co2_condition') or '') in co2]
-    if light:
-        plants = [p for p in plants if (p.get('light_condition') or '') in light]
-    return _filter_items_by_stock(plants, stock)
+# --- Helpers: home page ---
 
-
-# --- Public catalog pages (HTML) ---
-
-@app.route('/aqua-plants')
-def aqua_plants():
-    """Browse aquatic plants with CO₂, light, stock, category, and price filters."""
-    from models import get_plants_paginated
-    co2 = request.args.getlist('co2')
-    light = request.args.getlist('light')
-    stock = request.args.getlist('stock')
-    categories = request.args.getlist('category')
-    prices = request.args.getlist('price')
-    per_page, page = _resolve_catalog_per_page()
-    page_plants, total, total_pages, page = get_plants_paginated(
-        page, per_page, categories=categories, co2=co2, light=light, stock=stock, prices=prices
-    )
-    _attach_catalog_images(page_plants, 'serve_plant_image')
-    return render_template(
-        'aqua_plants.html',
-        plants=page_plants,
-        co2_filter=co2,
-        light_filter=light,
-        stock_filter=stock,
-        category_filter=categories,
-        price_filter=prices,
-        page=page,
-        total=total,
-        total_pages=total_pages,
-        per_page=per_page,
-        item_label='plant',
-    )
-
-
-@app.route('/aqua-plants/<int:id>')
-def plant_detail(id):
-    """Single plant page — gallery, care info, and the product-scoped chatbot."""
-    from models import get_plant_by_id
-    plant = get_plant_by_id(id)
-    if not plant:
-        return redirect(url_for('aqua_plants'))
-    _attach_catalog_detail_images(plant, 'serve_plant_image')
-    return render_template('plant_detail.html', plant=plant)
-
-
-@app.route('/api/plants')
-def api_plants():
-    """JSON plant list for infinite scroll / AJAX loading on the storefront."""
-    from models import get_plants_paginated
-    page = request.args.get('page', 1, type=int)
-    co2 = request.args.getlist('co2')
-    light = request.args.getlist('light')
-    stock = request.args.getlist('stock')
-    categories = request.args.getlist('category')
-    prices = request.args.getlist('price')
-    per_page = 12
-    page_plants, total, total_pages, page = get_plants_paginated(
-        page, per_page, categories=categories, co2=co2, light=light, stock=stock, prices=prices
-    )
-    _attach_catalog_images(page_plants, 'serve_plant_image')
-    return jsonify(plants=page_plants, has_more=page < total_pages)
-
-
-@app.route('/accessories')
-def accessories():
-    """Browse tools and accessories (stored as 'tools' in the database)."""
-    from models import get_tools_paginated
-    stock = request.args.getlist('stock')
-    categories = request.args.getlist('category')
-    prices = request.args.getlist('price')
-    per_page, page = _resolve_catalog_per_page()
-    page_items, total, total_pages, page = get_tools_paginated(
-        page, per_page, categories=categories, stock=stock, prices=prices
-    )
-    _attach_catalog_images(page_items, 'serve_tool_image')
-    return render_template(
-        'accessories.html',
-        accessories=page_items,
-        stock_filter=stock,
-        category_filter=categories,
-        price_filter=prices,
-        page=page,
-        total=total,
-        total_pages=total_pages,
-        per_page=per_page,
-        item_label='accessory',
-    )
-
-
-@app.route('/accessories/<int:id>')
-def accessory_detail(id):
-    """Single accessory page with gallery and product-scoped chatbot."""
-    from models import get_tool_by_id
-    item = get_tool_by_id(id)
-    if not item:
-        return redirect(url_for('accessories'))
-    _attach_catalog_detail_images(item, 'serve_tool_image')
-    return render_template('accessory_detail.html', item=item)
-
-
-@app.route('/api/accessories')
-def api_accessories():
-    """JSON accessory list for AJAX pagination on the storefront."""
-    from models import get_tools_paginated
-    page = request.args.get('page', 1, type=int)
-    stock = request.args.getlist('stock')
-    categories = request.args.getlist('category')
-    prices = request.args.getlist('price')
-    per_page = 12
-    page_items, total, total_pages, page = get_tools_paginated(
-        page, per_page, categories=categories, stock=stock, prices=prices
-    )
-    _attach_catalog_images(page_items, 'serve_tool_image')
-    return jsonify(accessories=page_items, has_more=page < total_pages)
-
-
-@app.route('/foods')
-def foods():
-    """Browse fish food products."""
-    from models import get_foods_paginated
-    stock = request.args.getlist('stock')
-    categories = request.args.getlist('category')
-    prices = request.args.getlist('price')
-    per_page, page = _resolve_catalog_per_page()
-    page_items, total, total_pages, page = get_foods_paginated(
-        page, per_page, categories=categories, stock=stock, prices=prices
-    )
-    _attach_catalog_images(page_items, 'serve_food_image')
-    return render_template(
-        'foods.html',
-        foods=page_items,
-        stock_filter=stock,
-        category_filter=categories,
-        price_filter=prices,
-        page=page,
-        total=total,
-        total_pages=total_pages,
-        per_page=per_page,
-        item_label='food',
-    )
-
-
-@app.route('/foods/<int:id>')
-def food_detail(id):
-    """Single food product page with gallery and product-scoped chatbot."""
-    from models import get_food_by_id
-    item = get_food_by_id(id)
-    if not item:
-        return redirect(url_for('foods'))
-    _attach_catalog_detail_images(item, 'serve_food_image')
-    return render_template('food_detail.html', item=item)
-
-
-@app.route('/api/foods')
-def api_foods():
-    """JSON food list for AJAX pagination on the storefront."""
-    from models import get_foods_paginated
-    page = request.args.get('page', 1, type=int)
-    stock = request.args.getlist('stock')
-    categories = request.args.getlist('category')
-    prices = request.args.getlist('price')
-    per_page = 12
-    page_items, total, total_pages, page = get_foods_paginated(
-        page, per_page, categories=categories, stock=stock, prices=prices
-    )
-    _attach_catalog_images(page_items, 'serve_food_image')
-    return jsonify(foods=page_items, has_more=page < total_pages)
-
-
-@app.route('/api/delivery-rule')
-def api_delivery_rule():
-    """
-    Return delivery pricing for the checkout cart.
-
-    Formula: base_price + (weight_kg × extra_per_kg). Falls back to defaults
-    if nothing is configured in the database yet.
-    """
-    from models import get_delivery_base_per_kg
-    rule = get_delivery_base_per_kg()
-    if not rule:
-        return jsonify(base_price=450, extra_per_kg=100)
-    return jsonify(base_price=float(rule['base_price']), extra_per_kg=float(rule['extra_per_kg']))
+def _home_top_static_image(product_type):
+    """Return a static URL for a home featured product image, if the file exists."""
+    rel = HOME_TOP_SELLING_IMAGES.get(product_type)
+    if not rel:
+        return None
+    static_root = os.path.join(app.root_path, 'static')
+    base, ext = os.path.splitext(rel)
+    for candidate_ext in (ext, '.jpg', '.jpeg', '.png', '.webp'):
+        candidate = base + candidate_ext if candidate_ext != ext else rel
+        if os.path.isfile(os.path.join(static_root, candidate)):
+            return url_for('static', filename=candidate.replace('\\', '/'))
+    return None
 
 
 def get_top_selling():
     """
-    Grab a small mix of products for the home page carousel.
+    One featured product per category for the home page (plant, accessory, food).
 
-    Not true "top sellers" yet — just the first few from each category.
+    Product names/prices/links come from the database (second item per catalog).
+    Images are served from static/images/home/ when those files exist.
+    Re-export with: python scripts/export_home_top_images.py
     """
     from models import get_foods, get_plants, get_tools
 
+    def pick_second(rows):
+        if not rows:
+            return None
+        return rows[1] if len(rows) > 1 else rows[0]
+
     items = []
-    plants = get_plants()[:2]
-    tools = get_tools()[:2]
-    foods = get_foods()[:2]
-    _attach_catalog_images(plants, 'serve_plant_image')
-    _attach_catalog_images(tools, 'serve_tool_image')
-    _attach_catalog_images(foods, 'serve_food_image')
-    for plant in plants:
-        items.append({**plant, 'product_type': 'plant'})
-    for tool in tools:
-        items.append({**tool, 'product_type': 'accessory'})
-    for food in foods:
-        items.append({**food, 'product_type': 'food'})
+    for get_list, endpoint, product_type in (
+        (get_plants, 'serve_plant_image', 'plant'),
+        (get_tools, 'serve_tool_image', 'accessory'),
+        (get_foods, 'serve_food_image', 'food'),
+    ):
+        item = pick_second(get_list())
+        if not item:
+            continue
+        item['image'] = _home_top_static_image(product_type) or ''
+        if not item['image']:
+            _attach_catalog_images([item], endpoint)
+        items.append({**item, 'product_type': product_type})
     return items
 
 
@@ -497,92 +307,7 @@ def get_category_preview_images():
     }
 
 
-@app.route('/tools')
-def tools():
-    """Placeholder tools page (main shop uses /accessories)."""
-    return render_template('tools.html')
-
-
-@app.route('/contact', methods=['GET', 'POST'])
-def contact():
-    """Contact form — saves messages for the admin inbox."""
-    if request.method == 'POST':
-        from models import save_contact_message
-        name = request.form.get('name', '').strip()
-        email = request.form.get('email', '').strip()
-        subject = request.form.get('subject', '').strip()
-        message = request.form.get('message', '').strip()
-        if name and email and subject and message:
-            new_id, _ = save_contact_message(name, email, subject, message)
-            if new_id:
-                flash('Thank you! Your message has been sent.', 'success')
-                return redirect(url_for('contact'))
-    return render_template('contact.html')
-
-
-@app.route('/checkout')
-def checkout():
-    """Checkout page — cart checkout posts to /api/orders via JavaScript."""
-    return render_template('checkout.html')
-
-
-@app.route('/api/orders', methods=['POST'])
-def api_create_order():
-    """
-    Place an order from the checkout page.
-
-    Expects JSON with customer details and a list of cart line items.
-    """
-    from models import create_order
-
-    data = request.get_json(silent=True) or {}
-    customer_name = (data.get('customer_name') or '').strip()
-    customer_email = (data.get('customer_email') or '').strip()
-    customer_phone = (data.get('customer_phone') or '').strip()
-    delivery_address = (data.get('delivery_address') or '').strip()
-    notes = (data.get('notes') or '').strip()
-    items = data.get('items') or []
-
-    if not customer_name or not customer_email:
-        return jsonify(success=False, error='Name and email are required.'), 400
-    if not delivery_address:
-        return jsonify(success=False, error='Delivery address is required.'), 400
-    if not items:
-        return jsonify(success=False, error='Your cart is empty.'), 400
-
-    order_id, error = create_order(
-        customer_name,
-        customer_email,
-        customer_phone,
-        delivery_address,
-        notes,
-        items,
-    )
-    if not order_id:
-        return jsonify(success=False, error=error or 'Could not place order.'), 400
-    return jsonify(success=True, order_id=order_id)
-
-
-@app.route('/signin')
-def signin():
-    """Open the admin sign-in modal on the home page (or go to dashboard if already logged in)."""
-    if session.get('admin'):
-        return redirect(url_for('admin_dashboard'))
-    return redirect(url_for('index') + '?open=signin')
-
-
-@app.route('/admin/login', methods=['POST'])
-def admin_login():
-    """AJAX admin login — sets session['admin'] and returns a redirect URL."""
-    username = request.form.get('username', '')
-    password = request.form.get('password', '')
-    if username and password:
-        from models import verify_admin
-        if verify_admin(username, password):
-            session['admin'] = True
-            return jsonify(success=True, redirect=url_for('admin_dashboard'))
-    return jsonify(success=False, error='Invalid username or password'), 401
-
+# --- Helpers: auth ---
 
 def admin_required(f):
     """
@@ -598,179 +323,25 @@ def admin_required(f):
     return inner
 
 
-# --- Admin area ---
-
-@app.route('/admin')
-@admin_required
-def admin_dashboard():
-    """Admin home — links to catalog, orders, messages, etc."""
-    return render_template('admin_dashboard.html')
-
-
-PER_PAGE_OPTIONS = (5, 10, 20, 50)
-
-
-def _resolve_admin_per_page(session_key, default, options):
-    """
-    Same idea as _resolve_catalog_per_page, but for admin lists (orders, messages).
-
-    Keeps the user's preferred page size in the session.
-    """
-    per_page_arg = request.args.get('per_page', type=int)
-    page = request.args.get('page', 1, type=int)
-    prev_per_page = session.get(session_key, default)
-    if per_page_arg is not None and per_page_arg in options:
-        session[session_key] = per_page_arg
-        if per_page_arg != prev_per_page:
-            page = 1
-    per_page = session.get(session_key, default)
-    if per_page not in options:
-        per_page = default
-    return per_page, page
-
-
-@app.route('/admin/messages')
-@admin_required
-def admin_messages():
-    """Inbox of contact form submissions from customers."""
-    from models import get_contact_messages_paginated
-    per_page, page = _resolve_admin_per_page('messages_per_page', 10, PER_PAGE_OPTIONS)
-    messages, total, total_pages, current_page = get_contact_messages_paginated(page, per_page)
-    notice, notice_type = _get_flashed_notice()
-    return render_template(
-        'admin_messages.html',
-        messages=messages,
-        total=total,
-        total_pages=total_pages,
-        page=current_page,
-        per_page=per_page,
-        per_page_options=PER_PAGE_OPTIONS,
-        notice=notice,
-        notice_type=notice_type,
-    )
-
-
-@app.route('/admin/messages/<int:message_id>/reply', methods=['POST'])
-@admin_required
-def admin_message_reply(message_id):
-    """Save an admin reply to a contact message (email sending not wired up yet)."""
-    from models import get_contact_message_by_id
-
-    message = get_contact_message_by_id(message_id)
-    if not message:
-        flash('Message not found.', 'error')
-        return redirect(url_for('admin_messages'))
-
-    reply_subject = request.form.get('reply_subject', '').strip()
-    reply_body = request.form.get('reply_body', '').strip()
-    if not reply_subject or not reply_body:
-        flash('Reply subject and message are required.', 'error')
-        return redirect(url_for('admin_messages'))
-
-    # TODO: send email to message['email'] with reply_subject and reply_body
-    _ = (message, reply_subject, reply_body)
-
-    flash('Reply saved. Email delivery will be enabled in a future update.', 'success')
-    return redirect(url_for('admin_messages'))
-
-
-@app.route('/admin/orders')
-@admin_required
-def admin_orders():
-    """Paginated list of customer orders with status summary counts."""
-    from models import get_orders_paginated, get_order_status_counts
-
-    per_page, page = _resolve_admin_per_page('orders_per_page', 10, PER_PAGE_OPTIONS)
-    orders, total, total_pages, current_page = get_orders_paginated(page, per_page)
-    status_counts = get_order_status_counts()
-    notice, notice_type = _get_flashed_notice()
-    return render_template(
-        'admin_orders.html',
-        orders=orders,
-        total=total,
-        total_pages=total_pages,
-        page=current_page,
-        per_page=per_page,
-        per_page_options=PER_PAGE_OPTIONS,
-        status_counts=status_counts,
-        notice=notice,
-        notice_type=notice_type,
-    )
-
-
-@app.route('/admin/orders/<int:order_id>', methods=['GET'])
-@admin_required
-def admin_order_detail(order_id):
-    """Single order view — line items, customer details, status update form."""
-    from models import get_order_by_id
-
-    order = get_order_by_id(order_id)
-    if not order:
-        return redirect(url_for('admin_orders'))
-
-    _attach_order_item_images(order['items'])
-
-    message, message_type = _get_flashed_notice()
-
-    return render_template(
-        'admin_order_detail.html',
-        order=order,
-        message=message,
-        message_type=message_type,
-    )
-
-
-@app.route('/admin/orders/<int:order_id>/status', methods=['POST'])
-@admin_required
-def admin_order_status(order_id):
-    """Update order status from the list or detail page, then redirect back."""
-    from models import update_order_status
-
-    status = request.form.get('status', '').strip()
-    return_to = request.form.get('return_to', 'list')
-    page = request.form.get('page', 1, type=int)
-    per_page = request.form.get('per_page', type=int)
-
-    if not update_order_status(order_id, status):
-        flash('Could not update order status.', 'error')
-        if return_to == 'detail':
-            return redirect(url_for('admin_order_detail', order_id=order_id))
-        params = {'page': page}
-        if per_page:
-            params['per_page'] = per_page
-        return redirect(url_for('admin_orders', **params))
-
-    flash('Order status updated.', 'success')
-    if return_to == 'detail':
-        return redirect(url_for('admin_order_detail', order_id=order_id))
-
-    params = {'page': page}
-    if per_page:
-        params['per_page'] = per_page
-    return redirect(url_for('admin_orders', **params))
-
-
-def _filter_items_by_stock(items, stock):
-    """Filter catalog rows by in-stock / out-of-stock sidebar selections."""
-    if not stock:
-        return items
-    in_ok = 'in' in stock
-    out_ok = 'out' in stock
-    if in_ok and not out_ok:
-        return [x for x in items if x.get('in_stock', True)]
-    if out_ok and not in_ok:
-        return [x for x in items if not x.get('in_stock', True)]
-    return items
-
-
-def _filter_plants_for_admin(plants, co2, light, stock, categories=None):
-    """Same plant filters as the storefront, reused on the admin plant list."""
-    return _filter_plants(plants, co2, light, stock, categories or [])
-
+# --- Helpers: admin catalog ---
 
 def _ensure_plant_images(plants):
     """Make sure list rows have an `image` key templates can render."""
     _attach_catalog_images(plants, 'serve_plant_image')
+
+
+def _read_uploaded_image(field_name):
+    """Read one image upload field; returns (bytes, mime) or (None, None) if empty."""
+    f = request.files.get(field_name)
+    if not f or f.filename == '':
+        return (None, None)
+    data = f.read()
+    if not data:
+        return (None, None)
+    mime = f.content_type or MIME_JPEG
+    if mime not in (MIME_JPEG, 'image/png', 'image/gif', 'image/webp'):
+        mime = MIME_JPEG
+    return (data, mime[:20])
 
 
 def _blank_catalog_item():
@@ -970,54 +541,6 @@ def _admin_delete_product(table, item_id, get_by_id, list_route, item_label):
     return redirect(list_route)
 
 
-# --- Admin catalog (plants, tools, foods) ---
-
-@app.route('/admin/plants', methods=['GET'])
-@admin_required
-def admin_plants():
-    """Manage plants — same filters as the public catalog plus edit/delete actions."""
-    from models import get_plants_paginated
-    message, message_type = _admin_list_flash_message('Plant')
-    co2 = request.args.getlist('co2')
-    light = request.args.getlist('light')
-    stock = request.args.getlist('stock')
-    categories = request.args.getlist('category')
-    prices = request.args.getlist('price')
-    per_page, page = _resolve_catalog_per_page()
-    page_plants, total, total_pages, page = get_plants_paginated(
-        page, per_page, categories=categories, co2=co2, light=light, stock=stock, prices=prices
-    )
-    _ensure_plant_images(page_plants)
-    return render_template(
-        'admin_plants.html',
-        plants=page_plants,
-        message=message,
-        message_type=message_type,
-        co2_filter=co2,
-        light_filter=light,
-        stock_filter=stock,
-        category_filter=categories,
-        price_filter=prices,
-        page=page,
-        total=total,
-        total_pages=total_pages,
-        per_page=per_page,
-        item_label='plant',
-    )
-
-
-@app.route('/admin/plants/<int:id>')
-@admin_required
-def admin_plant_detail(id):
-    """Admin preview of a plant — same info as the public detail page."""
-    from models import get_plant_by_id
-    plant = get_plant_by_id(id)
-    if not plant:
-        return redirect(url_for('admin_plants'))
-    _attach_catalog_images([plant], 'serve_plant_image')
-    return render_template('admin_plant_detail.html', plant=plant)
-
-
 def _save_plant_form(item_id=None):
     """
     Handle create/update POST for the plant edit form.
@@ -1064,6 +587,513 @@ def _save_plant_form(item_id=None):
     item['co2_condition'] = form_data.get('co2_condition') or ''
     item['light_condition'] = form_data.get('light_condition') or ''
     return item, fail_msg, 'error'
+
+
+def _save_tool_food_form(table, add_fn, update_fn, list_route, edit_route, edit_template, item_label, item_id=None):
+    """
+    Shared create/edit handler for tools and foods.
+
+    Same shape as plants but without the extra care-level fields.
+    """
+    from models import _update_item_images
+    form_data = _parse_catalog_form_fields()
+    plant_fields = {k: form_data[k] for k in ('name', 'price', 'category', 'weight', 'description', 'in_stock')}
+    if not plant_fields['name'] or not plant_fields['category']:
+        item = dict(_blank_catalog_item(), **plant_fields)
+        return item, MSG_NAME_CATEGORY_REQUIRED, 'error'
+    img1, t1 = _read_uploaded_image('image1')
+    img2, t2 = _read_uploaded_image('image2')
+    img3, t3 = _read_uploaded_image('image3')
+    images = ((img1, t1), (img2, t2), (img3, t3))
+    if item_id:
+        if not update_fn(item_id, **plant_fields):
+            merged = dict(_blank_catalog_item(), **plant_fields)
+            merged['id'] = item_id
+            return merged, f'Failed to update {table[:-1]}.', 'error'
+        _update_item_images(table, item_id, images)
+        uploaded_count, deleted_count = _process_catalog_file_changes(table, item_id)
+        _flash_catalog_save_message(item_label, 'updated', table, item_id, uploaded_count, deleted_count)
+        return redirect(url_for(edit_route, id=item_id))
+    new_id, err = add_fn(
+        plant_fields['name'], plant_fields['price'], plant_fields['category'], plant_fields['description'],
+        img1, t1, img2, t2, img3, t3, plant_fields['weight'], plant_fields['in_stock'],
+    )
+    if new_id:
+        uploaded_count, deleted_count = _process_catalog_file_changes(table, new_id)
+        _flash_catalog_save_message(item_label, 'added', table, new_id, uploaded_count, deleted_count)
+        return redirect(url_for(edit_route, id=new_id))
+    fail_msg = f'Failed to add {table[:-1]}: {err}' if err else f'Failed to add {table[:-1]}. Check database connection.'
+    return dict(_blank_catalog_item(), **plant_fields), fail_msg, 'error'
+
+
+# --- Public pages ---
+
+@app.route('/')
+def index():
+    """Home page — featured products, category previews, and testimonials."""
+    return render_template(
+        'public.html',
+        top_products=get_top_selling(),
+        category_images=get_category_preview_images(),
+        testimonials=HOME_TESTIMONIALS,
+    )
+
+
+@app.route('/public')
+def public():
+    """Legacy URL — send people to the main home page."""
+    return redirect(url_for('index'))
+
+
+# --- Public catalog pages (HTML) ---
+
+@app.route('/aqua-plants')
+def aqua_plants():
+    """Browse aquatic plants with CO₂, light, stock, category, and price filters."""
+    from models import get_plants_paginated
+    co2 = request.args.getlist('co2')
+    light = request.args.getlist('light')
+    stock = request.args.getlist('stock')
+    categories = request.args.getlist('category')
+    prices = request.args.getlist('price')
+    per_page, page = _resolve_catalog_per_page()
+    page_plants, total, total_pages, page = get_plants_paginated(
+        page, per_page, categories=categories, co2=co2, light=light, stock=stock, prices=prices
+    )
+    _attach_catalog_images(page_plants, 'serve_plant_image')
+    return render_template(
+        'aqua_plants.html',
+        plants=page_plants,
+        co2_filter=co2,
+        light_filter=light,
+        stock_filter=stock,
+        category_filter=categories,
+        price_filter=prices,
+        page=page,
+        total=total,
+        total_pages=total_pages,
+        per_page=per_page,
+        item_label='plant',
+    )
+
+
+@app.route('/aqua-plants/<int:id>')
+def plant_detail(id):
+    """Single plant page — gallery, care info, and the product-scoped chatbot."""
+    from models import get_plant_by_id
+    plant = get_plant_by_id(id)
+    if not plant:
+        return redirect(url_for('aqua_plants'))
+    _attach_catalog_detail_images(plant, 'serve_plant_image')
+    return render_template('plant_detail.html', plant=plant)
+
+
+# --- Public API ---
+
+@app.route('/api/plants')
+def api_plants():
+    """JSON plant list for infinite scroll / AJAX loading on the storefront."""
+    from models import get_plants_paginated
+    page = request.args.get('page', 1, type=int)
+    co2 = request.args.getlist('co2')
+    light = request.args.getlist('light')
+    stock = request.args.getlist('stock')
+    categories = request.args.getlist('category')
+    prices = request.args.getlist('price')
+    per_page = 12
+    page_plants, total, total_pages, page = get_plants_paginated(
+        page, per_page, categories=categories, co2=co2, light=light, stock=stock, prices=prices
+    )
+    _attach_catalog_images(page_plants, 'serve_plant_image')
+    return jsonify(plants=page_plants, has_more=page < total_pages)
+
+
+@app.route('/accessories')
+def accessories():
+    """Browse tools and accessories (stored as 'tools' in the database)."""
+    from models import get_tools_paginated
+    stock = request.args.getlist('stock')
+    categories = request.args.getlist('category')
+    prices = request.args.getlist('price')
+    per_page, page = _resolve_catalog_per_page()
+    page_items, total, total_pages, page = get_tools_paginated(
+        page, per_page, categories=categories, stock=stock, prices=prices
+    )
+    _attach_catalog_images(page_items, 'serve_tool_image')
+    return render_template(
+        'accessories.html',
+        accessories=page_items,
+        stock_filter=stock,
+        category_filter=categories,
+        price_filter=prices,
+        page=page,
+        total=total,
+        total_pages=total_pages,
+        per_page=per_page,
+        item_label='accessory',
+    )
+
+
+@app.route('/accessories/<int:id>')
+def accessory_detail(id):
+    """Single accessory page with gallery and product-scoped chatbot."""
+    from models import get_tool_by_id
+    item = get_tool_by_id(id)
+    if not item:
+        return redirect(url_for('accessories'))
+    _attach_catalog_detail_images(item, 'serve_tool_image')
+    return render_template('accessory_detail.html', item=item)
+
+
+@app.route('/api/accessories')
+def api_accessories():
+    """JSON accessory list for AJAX pagination on the storefront."""
+    from models import get_tools_paginated
+    page = request.args.get('page', 1, type=int)
+    stock = request.args.getlist('stock')
+    categories = request.args.getlist('category')
+    prices = request.args.getlist('price')
+    per_page = 12
+    page_items, total, total_pages, page = get_tools_paginated(
+        page, per_page, categories=categories, stock=stock, prices=prices
+    )
+    _attach_catalog_images(page_items, 'serve_tool_image')
+    return jsonify(accessories=page_items, has_more=page < total_pages)
+
+
+@app.route('/foods')
+def foods():
+    """Browse fish food products."""
+    from models import get_foods_paginated
+    stock = request.args.getlist('stock')
+    categories = request.args.getlist('category')
+    prices = request.args.getlist('price')
+    per_page, page = _resolve_catalog_per_page()
+    page_items, total, total_pages, page = get_foods_paginated(
+        page, per_page, categories=categories, stock=stock, prices=prices
+    )
+    _attach_catalog_images(page_items, 'serve_food_image')
+    return render_template(
+        'foods.html',
+        foods=page_items,
+        stock_filter=stock,
+        category_filter=categories,
+        price_filter=prices,
+        page=page,
+        total=total,
+        total_pages=total_pages,
+        per_page=per_page,
+        item_label='food',
+    )
+
+
+@app.route('/foods/<int:id>')
+def food_detail(id):
+    """Single food product page with gallery and product-scoped chatbot."""
+    from models import get_food_by_id
+    item = get_food_by_id(id)
+    if not item:
+        return redirect(url_for('foods'))
+    _attach_catalog_detail_images(item, 'serve_food_image')
+    return render_template('food_detail.html', item=item)
+
+
+@app.route('/api/foods')
+def api_foods():
+    """JSON food list for AJAX pagination on the storefront."""
+    from models import get_foods_paginated
+    page = request.args.get('page', 1, type=int)
+    stock = request.args.getlist('stock')
+    categories = request.args.getlist('category')
+    prices = request.args.getlist('price')
+    per_page = 12
+    page_items, total, total_pages, page = get_foods_paginated(
+        page, per_page, categories=categories, stock=stock, prices=prices
+    )
+    _attach_catalog_images(page_items, 'serve_food_image')
+    return jsonify(foods=page_items, has_more=page < total_pages)
+
+
+@app.route('/api/delivery-rule')
+def api_delivery_rule():
+    """
+    Return delivery pricing for the checkout cart.
+
+    Formula: base_price + (weight_kg × extra_per_kg). Falls back to defaults
+    if nothing is configured in the database yet.
+    """
+    from models import get_delivery_base_per_kg
+    rule = get_delivery_base_per_kg()
+    if not rule:
+        return jsonify(base_price=450, extra_per_kg=100)
+    return jsonify(base_price=float(rule['base_price']), extra_per_kg=float(rule['extra_per_kg']))
+
+
+@app.route('/tools')
+def tools():
+    """Placeholder tools page (main shop uses /accessories)."""
+    return render_template('tools.html')
+
+
+@app.route('/contact', methods=['GET', 'POST'])
+def contact():
+    """Contact form — saves messages for the admin inbox."""
+    if request.method == 'POST':
+        from models import save_contact_message
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip()
+        subject = request.form.get('subject', '').strip()
+        message = request.form.get('message', '').strip()
+        if name and email and subject and message:
+            new_id, _ = save_contact_message(name, email, subject, message)
+            if new_id:
+                flash('Thank you! Your message has been sent.', 'success')
+                return redirect(url_for('contact'))
+    return render_template('contact.html')
+
+
+@app.route('/checkout')
+def checkout():
+    """Checkout page — cart checkout posts to /api/orders via JavaScript."""
+    return render_template('checkout.html')
+
+
+@app.route('/api/orders', methods=['POST'])
+def api_create_order():
+    """
+    Place an order from the checkout page.
+
+    Expects JSON with customer details and a list of cart line items.
+    """
+    from models import create_order
+
+    data = request.get_json(silent=True) or {}
+    customer_name = (data.get('customer_name') or '').strip()
+    customer_email = (data.get('customer_email') or '').strip()
+    customer_phone = (data.get('customer_phone') or '').strip()
+    delivery_address = (data.get('delivery_address') or '').strip()
+    notes = (data.get('notes') or '').strip()
+    items = data.get('items') or []
+
+    if not customer_name or not customer_email:
+        return jsonify(success=False, error='Name and email are required.'), 400
+    if not delivery_address:
+        return jsonify(success=False, error='Delivery address is required.'), 400
+    if not items:
+        return jsonify(success=False, error='Your cart is empty.'), 400
+
+    order_id, error = create_order(
+        customer_name,
+        customer_email,
+        customer_phone,
+        delivery_address,
+        notes,
+        items,
+    )
+    if not order_id:
+        return jsonify(success=False, error=error or 'Could not place order.'), 400
+    return jsonify(success=True, order_id=order_id)
+
+
+# --- Auth ---
+
+@app.route('/signin')
+def signin():
+    """Open the admin sign-in modal on the home page (or go to dashboard if already logged in)."""
+    if session.get('admin'):
+        return redirect(url_for('admin_dashboard'))
+    return redirect(url_for('index') + '?open=signin')
+
+
+@app.route('/admin/login', methods=['POST'])
+def admin_login():
+    """AJAX admin login — sets session['admin'] and returns a redirect URL."""
+    username = request.form.get('username', '')
+    password = request.form.get('password', '')
+    if username and password:
+        from models import verify_admin
+        if verify_admin(username, password):
+            session['admin'] = True
+            return jsonify(success=True, redirect=url_for('admin_dashboard'))
+    return jsonify(success=False, error='Invalid username or password'), 401
+
+
+# --- Admin area ---
+
+@app.route('/admin')
+@admin_required
+def admin_dashboard():
+    """Admin home — links to catalog, orders, messages, etc."""
+    return render_template('admin_dashboard.html')
+
+
+@app.route('/admin/messages')
+@admin_required
+def admin_messages():
+    """Inbox of contact form submissions from customers."""
+    from models import get_contact_messages_paginated
+    per_page, page = _resolve_admin_per_page('messages_per_page', 10, PER_PAGE_OPTIONS)
+    messages, total, total_pages, current_page = get_contact_messages_paginated(page, per_page)
+    notice, notice_type = _get_flashed_notice()
+    return render_template(
+        'admin_messages.html',
+        messages=messages,
+        total=total,
+        total_pages=total_pages,
+        page=current_page,
+        per_page=per_page,
+        per_page_options=PER_PAGE_OPTIONS,
+        notice=notice,
+        notice_type=notice_type,
+    )
+
+
+@app.route('/admin/messages/<int:message_id>/reply', methods=['POST'])
+@admin_required
+def admin_message_reply(message_id):
+    """Save an admin reply to a contact message (email sending not wired up yet)."""
+    from models import get_contact_message_by_id
+
+    message = get_contact_message_by_id(message_id)
+    if not message:
+        flash('Message not found.', 'error')
+        return redirect(url_for('admin_messages'))
+
+    reply_subject = request.form.get('reply_subject', '').strip()
+    reply_body = request.form.get('reply_body', '').strip()
+    if not reply_subject or not reply_body:
+        flash('Reply subject and message are required.', 'error')
+        return redirect(url_for('admin_messages'))
+
+    # TODO: send email to message['email'] with reply_subject and reply_body
+    _ = (message, reply_subject, reply_body)
+
+    flash('Reply saved. Email delivery will be enabled in a future update.', 'success')
+    return redirect(url_for('admin_messages'))
+
+
+@app.route('/admin/orders')
+@admin_required
+def admin_orders():
+    """Paginated list of customer orders with status summary counts."""
+    from models import get_orders_paginated, get_order_status_counts
+
+    per_page, page = _resolve_admin_per_page('orders_per_page', 10, PER_PAGE_OPTIONS)
+    orders, total, total_pages, current_page = get_orders_paginated(page, per_page)
+    status_counts = get_order_status_counts()
+    notice, notice_type = _get_flashed_notice()
+    return render_template(
+        'admin_orders.html',
+        orders=orders,
+        total=total,
+        total_pages=total_pages,
+        page=current_page,
+        per_page=per_page,
+        per_page_options=PER_PAGE_OPTIONS,
+        status_counts=status_counts,
+        notice=notice,
+        notice_type=notice_type,
+    )
+
+
+@app.route('/admin/orders/<int:order_id>', methods=['GET'])
+@admin_required
+def admin_order_detail(order_id):
+    """Single order view — line items, customer details, status update form."""
+    from models import get_order_by_id
+
+    order = get_order_by_id(order_id)
+    if not order:
+        return redirect(url_for('admin_orders'))
+
+    _attach_order_item_images(order['items'])
+
+    message, message_type = _get_flashed_notice()
+
+    return render_template(
+        'admin_order_detail.html',
+        order=order,
+        message=message,
+        message_type=message_type,
+    )
+
+
+@app.route('/admin/orders/<int:order_id>/status', methods=['POST'])
+@admin_required
+def admin_order_status(order_id):
+    """Update order status from the list or detail page, then redirect back."""
+    from models import update_order_status
+
+    status = request.form.get('status', '').strip()
+    return_to = request.form.get('return_to', 'list')
+    page = request.form.get('page', 1, type=int)
+    per_page = request.form.get('per_page', type=int)
+
+    if not update_order_status(order_id, status):
+        flash('Could not update order status.', 'error')
+        if return_to == 'detail':
+            return redirect(url_for('admin_order_detail', order_id=order_id))
+        params = {'page': page}
+        if per_page:
+            params['per_page'] = per_page
+        return redirect(url_for('admin_orders', **params))
+
+    flash('Order status updated.', 'success')
+    if return_to == 'detail':
+        return redirect(url_for('admin_order_detail', order_id=order_id))
+
+    params = {'page': page}
+    if per_page:
+        params['per_page'] = per_page
+    return redirect(url_for('admin_orders', **params))
+
+
+# --- Admin catalog (plants, tools, foods) ---
+
+@app.route('/admin/plants', methods=['GET'])
+@admin_required
+def admin_plants():
+    """Manage plants — same filters as the public catalog plus edit/delete actions."""
+    from models import get_plants_paginated
+    message, message_type = _admin_list_flash_message('Plant')
+    co2 = request.args.getlist('co2')
+    light = request.args.getlist('light')
+    stock = request.args.getlist('stock')
+    categories = request.args.getlist('category')
+    prices = request.args.getlist('price')
+    per_page, page = _resolve_catalog_per_page()
+    page_plants, total, total_pages, page = get_plants_paginated(
+        page, per_page, categories=categories, co2=co2, light=light, stock=stock, prices=prices
+    )
+    _ensure_plant_images(page_plants)
+    return render_template(
+        'admin_plants.html',
+        plants=page_plants,
+        message=message,
+        message_type=message_type,
+        co2_filter=co2,
+        light_filter=light,
+        stock_filter=stock,
+        category_filter=categories,
+        price_filter=prices,
+        page=page,
+        total=total,
+        total_pages=total_pages,
+        per_page=per_page,
+        item_label='plant',
+    )
+
+
+@app.route('/admin/plants/<int:id>')
+@admin_required
+def admin_plant_detail(id):
+    """Admin preview of a plant — same info as the public detail page."""
+    from models import get_plant_by_id
+    plant = get_plant_by_id(id)
+    if not plant:
+        return redirect(url_for('admin_plants'))
+    _attach_catalog_images([plant], 'serve_plant_image')
+    return render_template('admin_plant_detail.html', plant=plant)
 
 
 @app.route('/admin/plants/new', methods=['GET', 'POST'])
@@ -1134,57 +1164,6 @@ def admin_plants_delete(id):
     """Remove a plant from the catalog."""
     from models import get_plant_by_id
     return _admin_delete_product('plants', id, get_plant_by_id, url_for('admin_plants'), 'Plant')
-
-
-def _save_tool_food_form(table, add_fn, update_fn, list_route, edit_route, edit_template, item_label, item_id=None):
-    """
-    Shared create/edit handler for tools and foods.
-
-    Same shape as plants but without the extra care-level fields.
-    """
-    from models import _update_item_images
-    form_data = _parse_catalog_form_fields()
-    plant_fields = {k: form_data[k] for k in ('name', 'price', 'category', 'weight', 'description', 'in_stock')}
-    if not plant_fields['name'] or not plant_fields['category']:
-        item = dict(_blank_catalog_item(), **plant_fields)
-        return item, MSG_NAME_CATEGORY_REQUIRED, 'error'
-    img1, t1 = _read_uploaded_image('image1')
-    img2, t2 = _read_uploaded_image('image2')
-    img3, t3 = _read_uploaded_image('image3')
-    images = ((img1, t1), (img2, t2), (img3, t3))
-    if item_id:
-        if not update_fn(item_id, **plant_fields):
-            merged = dict(_blank_catalog_item(), **plant_fields)
-            merged['id'] = item_id
-            return merged, f'Failed to update {table[:-1]}.', 'error'
-        _update_item_images(table, item_id, images)
-        uploaded_count, deleted_count = _process_catalog_file_changes(table, item_id)
-        _flash_catalog_save_message(item_label, 'updated', table, item_id, uploaded_count, deleted_count)
-        return redirect(url_for(edit_route, id=item_id))
-    new_id, err = add_fn(
-        plant_fields['name'], plant_fields['price'], plant_fields['category'], plant_fields['description'],
-        img1, t1, img2, t2, img3, t3, plant_fields['weight'], plant_fields['in_stock'],
-    )
-    if new_id:
-        uploaded_count, deleted_count = _process_catalog_file_changes(table, new_id)
-        _flash_catalog_save_message(item_label, 'added', table, new_id, uploaded_count, deleted_count)
-        return redirect(url_for(edit_route, id=new_id))
-    fail_msg = f'Failed to add {table[:-1]}: {err}' if err else f'Failed to add {table[:-1]}. Check database connection.'
-    return dict(_blank_catalog_item(), **plant_fields), fail_msg, 'error'
-
-
-def _read_uploaded_image(field_name):
-    """Read one image upload field; returns (bytes, mime) or (None, None) if empty."""
-    f = request.files.get(field_name)
-    if not f or f.filename == '':
-        return (None, None)
-    data = f.read()
-    if not data:
-        return (None, None)
-    mime = f.content_type or MIME_JPEG
-    if mime not in (MIME_JPEG, 'image/png', 'image/gif', 'image/webp'):
-        mime = MIME_JPEG
-    return (data, mime[:20])
 
 
 # --- Catalog documents & RAG ---

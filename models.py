@@ -558,21 +558,6 @@ def calculate_delivery_by_weight(weight_kg):
     return base + extra_kg * extra
 
 
-def get_contact_messages():
-    """Fetch all contact messages from the database, newest first."""
-    try:
-        conn = get_db_connection()
-        with conn.cursor() as cur:
-            cur.execute(
-                'SELECT id, name, email, subject, message, created_at FROM contact_messages ORDER BY created_at DESC'
-            )
-            rows = cur.fetchall()
-        conn.close()
-        return [dict(r) for r in rows] if rows else []
-    except Exception:
-        return []
-
-
 def get_contact_messages_paginated(page=1, per_page=15):
     """
     Fetch one page of contact messages from the DB (LIMIT/OFFSET).
