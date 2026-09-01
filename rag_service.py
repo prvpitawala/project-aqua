@@ -1,9 +1,6 @@
 """
-RAG helpers for product pages.
-
-Each plant / food / accessory can have text documents attached in admin.
-We turn those into searchable chunks, store embeddings in MySQL, and use them
-when a customer asks the chatbot a question about that specific product.
+Helps the chatbot answer questions using product documents.
+Reads uploaded files, saves them in pieces, and finds answers when customers ask.
 """
 import math
 import os
@@ -23,10 +20,7 @@ EMBED_BATCH_SIZE = 64
 
 
 def normalize_product_type(product_type):
-    """
-    Make sure we're using the same product_type string the database expects.
-    The storefront sometimes says 'accessory', but we store those rows as 'tool'.
-    """
+    """The shop calls it accessory but the database stores it as tool. This fixes the name."""
     pt = (product_type or '').strip().lower()
     if pt == 'accessory':
         return 'tool'
@@ -34,10 +28,7 @@ def normalize_product_type(product_type):
 
 
 def _openai_client():
-    """
-    Build an OpenAI client using the API key from .env.
-    Raises a clear error if OPENAI_API_KEY is missing so admin sees a useful message.
-    """
+    """Gets the OpenAI key from .env and connects. Shows an error if the key is missing."""
     from openai import OpenAI
     api_key = os.environ.get('OPENAI_API_KEY', '').strip()
     if not api_key:
@@ -46,11 +37,7 @@ def _openai_client():
 
 
 def extract_text(blob, filename):
-    """
-    Pull readable text out of an uploaded file blob.
-    Returns None if the extension isn't allowed or we can't decode the bytes.
-    We try a few common encodings because not every .txt file is saved as UTF-8.
-    """
+    """Reads text from an uploaded file. Returns nothing if the file type is wrong or we cannot read it."""
     if not blob:
         return None
     ext = os.path.splitext((filename or '').lower())[1]
@@ -65,11 +52,7 @@ def extract_text(blob, filename):
 
 
 def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
-    """
-    Break a long document into smaller overlapping pieces for embedding.
-    Small chunks fit better in the model context; overlap stops answers from
-    getting cut off right at a chunk boundary.
-    """
+    """Cuts a long text into smaller pieces. Some text repeats at the edges so nothing gets lost."""
     text = (text or '').strip()
     if not text:
         return []
@@ -89,10 +72,7 @@ def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
 
 
 def embed_texts(texts):
-    """
-    Turn a list of strings into embedding vectors via OpenAI.
-    Sends batches so we don't hit request size limits on big documents.
-    """
+    """Sends text to OpenAI and gets back number lists the computer can search with. Does it in batches for big files."""
     if not texts:
         return []
     client = _openai_client()
@@ -105,10 +85,7 @@ def embed_texts(texts):
 
 
 def cosine_similarity(a, b):
-    """
-    Score how similar two embedding vectors are (0 = unrelated, 1 = identical).
-    Used to rank which document chunks best match the customer's question.
-    """
+    """Checks how close two number lists are. Higher score means they match better."""
     dot = sum(x * y for x, y in zip(a, b))
     norm_a = math.sqrt(sum(x * x for x in a))
     norm_b = math.sqrt(sum(y * y for y in b))
@@ -118,12 +95,7 @@ def cosine_similarity(a, b):
 
 
 def index_product(product_type, product_id):
-    """
-    Build (or rebuild) the search index for one product.
-    Reads all attached text files, chunks them, embeds them, and saves rows
-    into product_rag_chunks. Old chunks for this product are replaced.
-    Returns (chunk_count, None) on success, or (None, error_message) on failure.
-    """
+    """Reads all files for one product, splits them into pieces, and saves them so the chatbot can search later."""
     from models import (
         delete_rag_chunks_for_product,
         get_product_files_with_data,
@@ -167,7 +139,7 @@ def index_product(product_type, product_id):
     for row, embedding in zip(pending, embeddings):
         row['embedding'] = embedding
 
-    # Fresh index each time — simpler than trying to patch individual chunks.
+    # Start over each time instead of trying to update old pieces one by one.
     delete_rag_chunks_for_product(product_type, product_id)
     inserted = insert_rag_chunks(pending)
     if inserted != len(pending):
@@ -177,11 +149,7 @@ def index_product(product_type, product_id):
 
 
 def search_chunks(product_type, product_id, query, top_k=TOP_K):
-    """
-    Find the document passages most relevant to a question.
-    Embeds the question, compares it to every stored chunk for this product,
-    and returns the top matches. Only chunks for this product are considered.
-    """
+    """Finds the text pieces that best match a customer question for one product."""
     from models import get_rag_chunks_for_product
 
     product_type = normalize_product_type(product_type)
@@ -207,17 +175,12 @@ def search_chunks(product_type, product_id, query, top_k=TOP_K):
         scored.append((cosine_similarity(query_vec, emb), chunk['content']))
 
     scored.sort(key=lambda item: item[0], reverse=True)
-    # Ignore zero-score matches — they aren't really related to the question.
+    # Skip pieces that do not really match the question.
     return [content for score, content in scored[:top_k] if score > 0]
 
 
 def answer_question(product_type, product_id, product_name, question):
-    """
-    Answer a customer question using only that product's indexed documents.
-    Flow: search relevant chunks → send them as context to GPT → return the reply.
-    If nothing is indexed yet, we return a friendly fallback instead of guessing.
-    Returns (answer_text, error_message) — one of the two will be None.
-    """
+    """Uses the product documents to answer a question. Sends the best matching text to GPT and returns the reply."""
     question = (question or '').strip()
     if not question:
         return None, 'Please enter a question.'
